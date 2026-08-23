@@ -16,7 +16,7 @@ export async function adminList<T>(
     orderBy?: string;
     ascending?: boolean;
     select?: string;
-    eq?: Record<string, string | number>;
+    eq?: Record<string, string | number | boolean>;
   },
 ): Promise<T[]> {
   await requireAdmin();
