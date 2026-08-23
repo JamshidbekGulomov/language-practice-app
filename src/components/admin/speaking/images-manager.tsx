@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
@@ -23,10 +23,16 @@ export function ImagesManager({
   const supabase = createClient();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const atCap = images.length >= cap;
 
   function handleFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      setError("That file isn't an image.");
+      return;
+    }
     setError(null);
     startTransition(async () => {
       try {
@@ -42,6 +48,21 @@ export function ImagesManager({
         setError(err instanceof Error ? err.message : "Upload failed");
       }
     });
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setIsDragging(false);
+    if (atCap || isPending) return;
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleFile(file);
+  }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLDivElement>) {
+    if (atCap || isPending) return;
+    const item = Array.from(e.clipboardData.items).find((i) => i.type.startsWith("image/"));
+    const file = item?.getAsFile();
+    if (file) handleFile(file);
   }
 
   return (
@@ -78,23 +99,51 @@ export function ImagesManager({
       )}
 
       {!atCap && (
-        <input
-          type="file"
-          accept="image/*"
-          disabled={isPending}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleFile(file);
-            e.target.value = "";
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => fileInputRef.current?.click()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              fileInputRef.current?.click();
+            }
           }}
-          className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-700"
-        />
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          onPaste={handlePaste}
+          className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-8 text-center transition ${
+            isDragging ? "border-slate-900 bg-slate-50" : "border-slate-300 hover:border-slate-400"
+          }`}
+        >
+          <p className="text-sm font-medium text-slate-600">
+            Click to upload, drag and drop, or paste a screenshot
+          </p>
+          <p className="mt-1 text-xs text-slate-400">PNG, JPG, or GIF</p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            disabled={isPending}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFile(file);
+              e.target.value = "";
+            }}
+            className="hidden"
+          />
+        </div>
       )}
       {atCap && (
         <p className="text-xs text-slate-500">
           Maximum of {cap} image{cap === 1 ? "" : "s"} reached.
         </p>
       )}
+      {isPending && <p className="text-xs text-slate-500">Uploading…</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   );
