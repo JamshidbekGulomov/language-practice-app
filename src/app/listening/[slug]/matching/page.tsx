@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getClipBySlug, getWordsForClip } from "@/lib/listening/queries";
 import { getCurrentProfile } from "@/lib/supabase/get-profile";
 import { sample } from "@/lib/vocabulary/sample";
+import { getAudioPublicUrl } from "@/lib/listening/storage";
 import { MatchingGame } from "@/components/matching-game";
 import { submitScore } from "@/app/listening/actions";
 
@@ -34,9 +35,10 @@ export default async function ListeningMatchingPage({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
-      <h1 className="mb-8 text-center text-2xl font-extrabold tracking-tight text-slate-900">
+      <h1 className="mb-4 text-center text-2xl font-extrabold tracking-tight text-slate-900">
         {clip.title} — Matching
       </h1>
+      <audio controls src={getAudioPublicUrl(clip.audio_path)} className="mx-auto mb-8 w-full max-w-md" />
       <MatchingGame
         pairs={pairs}
         backHref={`/listening/${slug}`}
