@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/slugify";
 import { isExam } from "@/lib/exam";
 import { LISTENING_AUDIO_BUCKET } from "@/lib/listening/storage";
+import { transcribeAudio } from "@/lib/ai/gemini";
 import type { ListeningExamTest, ListeningExamSection } from "@/lib/listening-exam/types";
 
 export async function createUploadUrl(fileName: string) {
@@ -70,6 +71,18 @@ export async function addSection(testId: string, formData: FormData) {
     transcript,
   });
   revalidatePath(`/admin/listening-exam/${testId}`);
+}
+
+/** Transcribes audio already uploaded to the listening-audio bucket (before the section row even exists), so admin can review/edit before saving. */
+export async function transcribeUploadedAudio(path: string): Promise<string> {
+  await requireAdmin();
+  const admin = createAdminClient();
+
+  const { data: file, error: downloadError } = await admin.storage.from(LISTENING_AUDIO_BUCKET).download(path);
+  if (downloadError || !file) throw new Error(downloadError?.message || "Could not read the uploaded audio");
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  return transcribeAudio(buffer.toString("base64"), file.type || "audio/mpeg");
 }
 
 export async function updateSectionTranscript(sectionId: string, testId: string, formData: FormData) {

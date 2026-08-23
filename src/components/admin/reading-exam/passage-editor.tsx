@@ -1,8 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { updatePassage, addWord, deleteWord } from "@/app/admin/reading-exam/actions";
+import { createClient } from "@/lib/supabase/client";
+import {
+  updatePassage,
+  addWord,
+  deleteWord,
+  createPdfUploadUrl,
+  analyzePassageWithAi,
+  suggestWords,
+  addWordsBulk,
+} from "@/app/admin/reading-exam/actions";
 import type {
   ReadingExamPassage,
   ReadingExamWord,
@@ -42,8 +51,18 @@ export function PassageEditor({
   words: ReadingExamWord[];
 }) {
   const router = useRouter();
+  const supabase = createClient();
   const [isPending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
+  const [aiPending, setAiPending] = useState(false);
+  const [aiProgress, setAiProgress] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiApplied, setAiApplied] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [wordSuggestions, setWordSuggestions] = useState<{ word: string; meaning: string; checked: boolean }[]>([]);
+  const [suggestingWords, setSuggestingWords] = useState(false);
+  const [wordSuggestError, setWordSuggestError] = useState<string | null>(null);
 
   const [title, setTitle] = useState(passage.title);
   const [subtitle, setSubtitle] = useState(passage.subtitle ?? "");
@@ -132,8 +151,101 @@ export function PassageEditor({
     });
   }
 
+  async function handleAnalyzePdf() {
+    const file = fileInputRef.current?.files?.[0];
+    if (!file) {
+      setAiError("Choose a PDF first");
+      return;
+    }
+    setAiError(null);
+    setAiApplied(false);
+    setAiPending(true);
+    try {
+      setAiProgress("Uploading PDF…");
+      const { path, token } = await createPdfUploadUrl(file.name);
+      const { error: uploadError } = await supabase.storage.from("admin-uploads").uploadToSignedUrl(path, token, file);
+      if (uploadError) throw new Error(uploadError.message);
+
+      setAiProgress("Reading passage and questions with AI… this can take a minute");
+      const draft = await analyzePassageWithAi(path);
+
+      if (draft.title) setTitle(draft.title);
+      if (draft.subtitle) setSubtitle(draft.subtitle);
+      if (draft.paragraphs.length) setParagraphs(draft.paragraphs);
+      if (draft.glossary.length) setGlossary(draft.glossary);
+      if (draft.paraphrase_pairs.length) setParaphrasePairs(draft.paraphrase_pairs);
+
+      const mhg = draft.question_groups.find((g): g is MatchingHeadingsGroup => g.type === "matching_headings");
+      if (mhg) {
+        setUseMH(true);
+        setMh(mhg);
+      }
+      const mfg = draft.question_groups.find((g): g is MatchingFeaturesGroup => g.type === "matching_features");
+      if (mfg) {
+        setUseMF(true);
+        setMf(mfg);
+      }
+      const scg = draft.question_groups.find((g): g is SummaryCompletionGroup => g.type === "summary_completion");
+      if (scg) {
+        setUseSC(true);
+        setSc(scg);
+      }
+
+      setAiApplied(true);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : "AI analysis failed");
+    } finally {
+      setAiPending(false);
+      setAiProgress(null);
+    }
+  }
+
+  async function handleSuggestWords() {
+    setWordSuggestError(null);
+    setSuggestingWords(true);
+    try {
+      const text = paragraphs.map((p) => p.text).join("\n\n");
+      const words = await suggestWords(text);
+      setWordSuggestions(words.map((w) => ({ ...w, checked: true })));
+    } catch (err) {
+      setWordSuggestError(err instanceof Error ? err.message : "Suggestion failed");
+    } finally {
+      setSuggestingWords(false);
+    }
+  }
+
+  function handleAddCheckedWords() {
+    const chosen = wordSuggestions.filter((w) => w.checked).map(({ word, meaning }) => ({ word, meaning }));
+    if (chosen.length === 0) return;
+    startTransition(async () => {
+      await addWordsBulk(passage.id, chosen);
+      setWordSuggestions([]);
+      router.refresh();
+    });
+  }
+
   return (
     <div className="space-y-6">
+      <Section title="🤖 Analyze a PDF with AI">
+        <p className="mb-3 text-xs text-slate-500">
+          Upload the exam PDF (passage + questions) and AI will fill in the passage, glossary, question groups, and
+          its own best-guess answers below — review and correct everything before saving.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <input ref={fileInputRef} type="file" accept="application/pdf" className="text-sm" />
+          <button
+            onClick={handleAnalyzePdf}
+            disabled={aiPending}
+            className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-500 disabled:opacity-50"
+          >
+            {aiPending ? (aiProgress ?? "Analyzing…") : "Analyze PDF"}
+          </button>
+          {aiApplied && <span className="text-sm font-medium text-emerald-600">Filled in below — please review ✓</span>}
+        </div>
+        {aiError && <p className="mt-2 text-sm text-red-600">{aiError}</p>}
+      </Section>
+
       <Section title="Passage text">
         <div className="space-y-3">
           <input
@@ -509,6 +621,41 @@ export function PassageEditor({
       </Section>
 
       <Section title="Vocabulary (word practice after the exam)">
+        <div className="mb-4 rounded-lg border border-purple-200 bg-purple-50 p-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handleSuggestWords}
+              disabled={suggestingWords || paragraphs.every((p) => !p.text.trim())}
+              className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-purple-500 disabled:opacity-50"
+            >
+              {suggestingWords ? "Thinking…" : "🤖 Suggest words from passage"}
+            </button>
+            {wordSuggestError && <span className="text-xs text-red-600">{wordSuggestError}</span>}
+          </div>
+          {wordSuggestions.length > 0 && (
+            <div className="mt-3 space-y-1">
+              {wordSuggestions.map((w, i) => (
+                <label key={i} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={w.checked}
+                    onChange={() =>
+                      setWordSuggestions(updateAt(wordSuggestions, i, { checked: !w.checked }))
+                    }
+                  />
+                  <strong>{w.word}</strong> — {w.meaning}
+                </label>
+              ))}
+              <button
+                onClick={handleAddCheckedWords}
+                disabled={isPending}
+                className="mt-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+              >
+                Add checked words
+              </button>
+            </div>
+          )}
+        </div>
         <div className="mb-3 space-y-1">
           {words.map((w) => (
             <div key={w.id} className="flex items-center justify-between rounded border border-slate-100 px-3 py-1.5 text-sm">
