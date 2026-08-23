@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import type { MCQuestion } from "@/lib/listening/build-mc-questions";
+import type { MCQuestion } from "@/lib/build-mc-questions";
 
 export function MultipleChoiceGame({
   questions,

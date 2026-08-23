@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import type { TranscriptToken } from "@/lib/listening/fill-blank";
+import type { TranscriptToken } from "@/lib/fill-blank";
 
 export function FillBlankGame({
   tokens,

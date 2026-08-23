@@ -1,9 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { getClipBySlug, getWordsForClip } from "@/lib/listening/queries";
 import { getCurrentProfile } from "@/lib/supabase/get-profile";
-import { buildMultipleChoiceQuestions } from "@/lib/listening/build-mc-questions";
+import { buildMultipleChoiceQuestions } from "@/lib/build-mc-questions";
 import { getAudioPublicUrl } from "@/lib/listening/storage";
-import { MultipleChoiceGame } from "@/components/listening/multiple-choice-game";
+import { MultipleChoiceGame } from "@/components/multiple-choice-game";
 import { submitScore } from "@/app/listening/actions";
 
 export default async function ListeningMultipleChoicePage({

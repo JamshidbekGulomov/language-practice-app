@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getCategoryBySlug, getWordsForCategory } from "@/lib/vocabulary/queries";
 import { getCurrentProfile } from "@/lib/supabase/get-profile";
-import { sample, MATCHING_ROUND_SIZE } from "@/lib/vocabulary/sample";
+import { sample, MATCHING_ROUND_SIZE } from "@/lib/sample";
 import { MatchingGame } from "@/components/matching-game";
 import { submitScore } from "@/app/vocabulary/actions";
 

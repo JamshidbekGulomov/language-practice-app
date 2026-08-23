@@ -1,9 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { getClipBySlug, getWordsForClip } from "@/lib/listening/queries";
 import { getCurrentProfile } from "@/lib/supabase/get-profile";
-import { buildFillBlankTemplate } from "@/lib/listening/fill-blank";
+import { buildFillBlankTemplate } from "@/lib/fill-blank";
 import { getAudioPublicUrl } from "@/lib/listening/storage";
-import { FillBlankGame } from "@/components/listening/fill-blank-game";
+import { FillBlankGame } from "@/components/fill-blank-game";
 import { submitScore } from "@/app/listening/actions";
 
 export default async function ListeningFillBlankPage({

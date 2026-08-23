@@ -1,12 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { getClipBySlug, getWordsForClip } from "@/lib/listening/queries";
 import { getCurrentProfile } from "@/lib/supabase/get-profile";
-import { sample } from "@/lib/vocabulary/sample";
+import { sample, MATCHING_ROUND_SIZE } from "@/lib/sample";
 import { getAudioPublicUrl } from "@/lib/listening/storage";
 import { MatchingGame } from "@/components/matching-game";
 import { submitScore } from "@/app/listening/actions";
-
-const ROUND_SIZE = 8;
 
 export default async function ListeningMatchingPage({
   params,
@@ -29,7 +27,7 @@ export default async function ListeningMatchingPage({
     );
   }
 
-  const round = sample(words, Math.min(ROUND_SIZE, words.length));
+  const round = sample(words, Math.min(MATCHING_ROUND_SIZE, words.length));
   const pairs = round.map((w) => ({ id: w.id, left: w.word, right: w.meaning! }));
   const boundSubmit = submitScore.bind(null, clip.id, slug, "matching");
 

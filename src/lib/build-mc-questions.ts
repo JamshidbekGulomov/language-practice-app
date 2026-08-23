@@ -1,6 +1,6 @@
-import type { ListeningWord } from "@/lib/listening/types";
-
 export type MCQuestion = { id: string; word: string; correct: string; options: string[] };
+
+type WordWithMeaning = { id: string; word: string; meaning: string | null };
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -11,9 +11,12 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-export function buildMultipleChoiceQuestions(words: ListeningWord[], roundSize = 8): MCQuestion[] {
+export function buildMultipleChoiceQuestions(
+  words: WordWithMeaning[],
+  roundSize = 8,
+): MCQuestion[] {
   const withMeaning = words.filter(
-    (w): w is ListeningWord & { meaning: string } => !!w.meaning,
+    (w): w is WordWithMeaning & { meaning: string } => !!w.meaning,
   );
   if (withMeaning.length < 4) return [];
 
