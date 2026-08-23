@@ -30,24 +30,25 @@ export default async function SpeakingTopicPage({
 
   const partDef = getPartDef(topic.exam, topic.part);
   const topicPath = `/speaking/${exam}/${slug}`;
-  const isQa = topic.format === "qa";
+  const isTurnBased = partDef?.interaction === "turns";
 
   const [profile, questions, hints, images, submission, questionSubmissions] = await Promise.all([
     getCurrentProfile(),
     getQuestions(topic.id),
     getHints(topic.id),
     topic.format === "images" ? getImages(topic.id) : Promise.resolve([]),
-    isQa ? Promise.resolve(null) : getMySubmission(topic.id),
-    isQa ? getMyQuestionSubmissions(topic.id) : Promise.resolve(new Map()),
+    isTurnBased ? Promise.resolve(null) : getMySubmission(topic.id),
+    isTurnBased ? getMyQuestionSubmissions(topic.id) : Promise.resolve(new Map()),
   ]);
 
   const boundMarkSelfChecked = markSelfChecked.bind(null, topicPath);
   const boundSendToTeacher = sendToTeacher.bind(null, topicPath);
 
-  // For qa format, each question gets its own recorder inline below — the
-  // plain list is only useful before login (or for other formats, where
-  // it's optional guidance alongside a single take).
-  const showQuestionList = questions.length > 0 && !(profile && isQa);
+  // For turn-based parts, each question gets its own recorder inline below
+  // (images, if any, stay visible above throughout) — the plain list is
+  // only useful before login, or for single-take parts where it's
+  // informational alongside the one recording.
+  const showQuestionList = questions.length > 0 && !(profile && isTurnBased);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
@@ -77,7 +78,7 @@ export default async function SpeakingTopicPage({
       {showQuestionList && (
         <div className="mt-6">
           <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">
-            {isQa ? "Questions" : "Guided questions"}
+            {topic.format === "cue_card" ? "Guided questions" : "Questions"}
           </h2>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
             {questions.map((q) => (
@@ -119,7 +120,7 @@ export default async function SpeakingTopicPage({
         <div className="mt-10">
           <h2 className="text-lg font-bold text-slate-900">Record your answer</h2>
           <div className="mt-4">
-            {isQa ? (
+            {isTurnBased ? (
               <QaPractice
                 topicId={topic.id}
                 topicPath={topicPath}
