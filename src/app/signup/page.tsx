@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AuthForm } from "@/components/auth-form";
+import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { signUp } from "@/app/auth/actions";
 
 export default function SignupPage() {
@@ -13,8 +14,16 @@ export default function SignupPage() {
       </p>
 
       <div className="mt-6">
-        <AuthForm action={signUp} submitLabel="Sign up" />
+        <GoogleSignInButton />
       </div>
+
+      <div className="my-6 flex items-center gap-3 text-xs font-medium text-slate-400">
+        <div className="h-px flex-1 bg-slate-200" />
+        OR
+        <div className="h-px flex-1 bg-slate-200" />
+      </div>
+
+      <AuthForm action={signUp} submitLabel="Sign up" />
 
       <p className="mt-6 text-center text-sm text-slate-500">
         Already have an account?{" "}
