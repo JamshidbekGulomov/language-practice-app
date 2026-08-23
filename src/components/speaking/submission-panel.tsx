@@ -60,6 +60,26 @@ export function SubmissionPanel({
         )}
       </div>
 
+      {(submission.ai_transcript || submission.ai_feedback) && (
+        <div className="mt-3 space-y-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            AI first pass (not a substitute for your teacher)
+          </p>
+          {submission.ai_transcript && (
+            <p>
+              <span className="font-medium text-slate-500">Transcript: </span>
+              {submission.ai_transcript}
+            </p>
+          )}
+          {submission.ai_feedback && (
+            <p>
+              <span className="font-medium text-slate-500">Feedback: </span>
+              {submission.ai_feedback}
+            </p>
+          )}
+        </div>
+      )}
+
       {submission.teacher_feedback && (
         <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Teacher feedback: {submission.teacher_feedback}

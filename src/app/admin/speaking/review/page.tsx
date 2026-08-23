@@ -6,6 +6,8 @@ import { leaveFeedback } from "@/app/admin/speaking/actions";
 type ReviewRow = {
   id: string;
   audio_path: string;
+  ai_transcript: string | null;
+  ai_feedback: string | null;
   teacher_feedback: string | null;
   created_at: string;
   profiles: { email: string; display_name: string | null } | null;
@@ -17,7 +19,7 @@ export default async function AdminSpeakingReviewPage() {
   const rows = await adminList<ReviewRow>("speaking_submissions", {
     eq: { sent_to_teacher: true },
     select:
-      "id, audio_path, teacher_feedback, created_at, profiles(email, display_name), speaking_topics(title), speaking_questions(question)",
+      "id, audio_path, ai_transcript, ai_feedback, teacher_feedback, created_at, profiles(email, display_name), speaking_topics(title), speaking_questions(question)",
     orderBy: "created_at",
     ascending: false,
   });
@@ -58,6 +60,26 @@ export default async function AdminSpeakingReviewPage() {
                 <audio controls src={r.audio_url} className="mt-2 w-full" />
               ) : (
                 <p className="mt-2 text-sm text-red-600">Couldn&apos;t load this recording.</p>
+              )}
+
+              {(r.ai_transcript || r.ai_feedback) && (
+                <div className="mt-2 space-y-1 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    AI first pass
+                  </p>
+                  {r.ai_transcript && (
+                    <p>
+                      <span className="font-medium text-slate-500">Transcript: </span>
+                      {r.ai_transcript}
+                    </p>
+                  )}
+                  {r.ai_feedback && (
+                    <p>
+                      <span className="font-medium text-slate-500">Feedback: </span>
+                      {r.ai_feedback}
+                    </p>
+                  )}
+                </div>
               )}
 
               {r.teacher_feedback ? (

@@ -3,7 +3,8 @@ import { adminList } from "@/lib/admin/crud";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { VocabWordsTable } from "@/components/admin/vocab/vocab-words-table";
 import { WordUploadForm } from "@/components/admin/vocab/word-upload-form";
-import { addWord, deleteWord } from "@/app/admin/vocabulary/actions";
+import { WordForm } from "@/components/admin/vocab/word-form";
+import { deleteWord } from "@/app/admin/vocabulary/actions";
 import type { VocabCategory, VocabWord } from "@/lib/vocabulary/types";
 
 export default async function AdminVocabCategoryPage({
@@ -31,44 +32,7 @@ export default async function AdminVocabCategoryPage({
 
       <WordUploadForm categoryId={id} />
 
-      <form
-        action={addWord.bind(null, id)}
-        className="mt-6 grid grid-cols-1 gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-2"
-      >
-        <input
-          name="english"
-          placeholder="English word"
-          required
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-        />
-        <input
-          name="uzbek"
-          placeholder="Uzbek translation"
-          required
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-        />
-        <input
-          name="synonym"
-          placeholder="Synonym (optional)"
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-        />
-        <input
-          name="difficulty"
-          placeholder="Difficulty (optional)"
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-        />
-        <input
-          name="example_sentence"
-          placeholder="Example sentence (optional)"
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm sm:col-span-2"
-        />
-        <button
-          type="submit"
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 sm:col-span-2"
-        >
-          Add word
-        </button>
-      </form>
+      <WordForm categoryId={id} />
 
       <div className="mt-6">
         <VocabWordsTable rows={words} onDelete={deleteWord.bind(null, id)} />

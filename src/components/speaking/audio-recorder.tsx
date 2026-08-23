@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { createUploadUrl, submitRecording } from "@/app/speaking/actions";
+import { createUploadUrl, submitRecording, analyzeSubmission } from "@/app/speaking/actions";
 import { SPEAKING_AUDIO_BUCKET } from "@/lib/speaking/storage";
 
-type Status = "idle" | "prep" | "recording" | "recorded" | "uploading";
+type Status = "idle" | "prep" | "recording" | "recorded" | "uploading" | "analyzing";
 
 function pickExtension(mimeType: string): string {
   if (mimeType.includes("mp4")) return "m4a";
@@ -139,7 +139,10 @@ export function AudioRecorder({
         .uploadToSignedUrl(path, token, blob);
       if (uploadError) throw new Error(uploadError.message);
 
-      await submitRecording(topicId, topicPath, path, questionId);
+      const submissionId = await submitRecording(topicId, topicPath, path, questionId);
+
+      setStatus("analyzing");
+      await analyzeSubmission(topicPath, submissionId);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -179,20 +182,24 @@ export function AudioRecorder({
         </div>
       )}
 
-      {(status === "recorded" || status === "uploading") && previewUrl && (
+      {(status === "recorded" || status === "uploading" || status === "analyzing") && previewUrl && (
         <div className="space-y-3">
           <audio controls src={previewUrl} className="w-full" />
           <div className="flex gap-2">
             <button
               onClick={submit}
-              disabled={status === "uploading"}
+              disabled={status !== "recorded"}
               className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
             >
-              {status === "uploading" ? "Submitting…" : "Submit recording"}
+              {status === "uploading"
+                ? "Submitting…"
+                : status === "analyzing"
+                  ? "Analyzing…"
+                  : "Submit recording"}
             </button>
             <button
               onClick={reRecord}
-              disabled={status === "uploading"}
+              disabled={status !== "recorded"}
               className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
             >
               Re-record

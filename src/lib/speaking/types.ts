@@ -40,6 +40,8 @@ export type SpeakingSubmission = {
   topic_id: string;
   question_id: string | null;
   audio_path: string;
+  ai_transcript: string | null;
+  ai_feedback: string | null;
   self_checked: boolean;
   sent_to_teacher: boolean;
   teacher_feedback: string | null;

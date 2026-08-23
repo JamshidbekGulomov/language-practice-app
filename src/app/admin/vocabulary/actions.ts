@@ -5,7 +5,17 @@ import { adminInsert, adminInsertMany, adminDelete } from "@/lib/admin/crud";
 import { requireAdmin } from "@/lib/supabase/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/slugify";
+import { suggestVocabWord, type VocabSuggestion } from "@/lib/ai/gemini";
 import type { VocabCategory, VocabWord } from "@/lib/vocabulary/types";
+
+/** AI-assisted first draft for a new word — admin reviews and edits before saving, this just saves the manual lookup. */
+export async function suggestWord(english: string): Promise<VocabSuggestion> {
+  const trimmed = english.trim();
+  if (!trimmed) throw new Error("Type the English word first");
+
+  await requireAdmin();
+  return suggestVocabWord(trimmed);
+}
 
 export async function createCategory(formData: FormData) {
   const name = (formData.get("name") as string)?.trim();

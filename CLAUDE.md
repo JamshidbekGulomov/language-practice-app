@@ -28,6 +28,8 @@ There is no test suite. Verification is: typecheck → `npm run build` → `npm 
 | `NEXT_PUBLIC_SUPABASE_URL` | browser + server | No |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser + server | No |
 | `SUPABASE_SERVICE_ROLE_KEY` | server only, bypasses RLS | **Yes** |
+| `GEMINI_API_KEY` | server only (`src/lib/ai/gemini.ts`) | **Yes** |
+| `GEMINI_MODEL` | server only, defaults to `gemini-2.0-flash` | No |
 
 Local dev: `cp .env.local.example .env.local` and fill in values (gitignored). Production values live in Vercel's project env settings.
 
@@ -65,6 +67,14 @@ The three formats are three distinct **practice mechanics**, not just different 
 Images (capped the same way, via `addImage`) live in `speaking_images`, in a **public** `speaking-images` bucket (admin-authored content, not personal, so no signed URLs needed) uploaded via the same signed-upload-URL flow as audio. Rendering them through `next/image` required whitelisting the Supabase Storage host in `next.config.ts`'s `images.remotePatterns`, derived from `NEXT_PUBLIC_SUPABASE_URL` at build time.
 
 Translation is still a placeholder (`src/components/admin/admin-module-placeholder.tsx` on the admin side, `src/components/module-landing.tsx` on the public side).
+
+## AI assist (Gemini, optional)
+
+`src/lib/ai/gemini.ts` wraps the Gemini REST API directly (plain `fetch`, no SDK dependency) behind `GEMINI_API_KEY` — every call is best-effort and degrades silently if the key isn't set or the request fails, since neither feature is load-bearing:
+- **Speaking submissions**: right after a student submits a recording (`submitRecording` in `src/app/speaking/actions.ts`), `AudioRecorder` calls `analyzeSubmission`, which downloads the audio via the service-role client and asks Gemini (multimodal, audio input directly — no separate transcription step) for a transcript + short written feedback, stored on `speaking_submissions.ai_transcript`/`ai_feedback`. Shown in `SubmissionPanel` and the admin review queue as "AI first pass", clearly separate from the teacher's own feedback — it's a head start, not a grade.
+- **Vocabulary admin**: `WordForm` (`src/components/admin/vocab/word-form.tsx`) has a "Suggest with AI" button that sends the English word to `suggestWord` (`src/app/admin/vocabulary/actions.ts`) and fills the Uzbek/synonym/example/difficulty fields from the response — admin still reviews and edits before saving, this just saves the manual lookup.
+
+Both call sites treat a missing/failing key as a no-op rather than an error: `analyzeSubmission` catches and leaves the AI columns null, and `suggestWord`'s only hard failure is an empty input.
 
 ## Generic CRUD scaffolding
 
