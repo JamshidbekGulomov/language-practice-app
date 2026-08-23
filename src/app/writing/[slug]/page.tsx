@@ -12,6 +12,7 @@ import { getVideoEmbed } from "@/lib/writing/video-embed";
 import { GapFillExercises } from "@/components/writing/gap-fill-exercises";
 import { SentenceExercises } from "@/components/writing/sentence-exercises";
 import { TelegramEmbed } from "@/components/writing/telegram-embed";
+import { VideoContainer } from "@/components/writing/video-container";
 import { submitGapFillResult, submitSentence, markSelfChecked, sendToTeacher } from "@/app/writing/actions";
 
 export default async function WritingLessonPage({
@@ -46,19 +47,27 @@ export default async function WritingLessonPage({
       {lesson.description && <p className="mt-1 text-slate-500">{lesson.description}</p>}
 
       {embed?.kind === "youtube" && (
-        <div className="mt-6 aspect-video w-full overflow-hidden rounded-lg border border-slate-200">
-          <iframe
-            src={embed.embedUrl}
-            title={lesson.title}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            className="h-full w-full"
-          />
+        <div className="mt-6">
+          <VideoContainer>
+            <div className="aspect-video w-full">
+              <iframe
+                src={embed.embedUrl}
+                title={lesson.title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="h-full w-full"
+              />
+            </div>
+          </VideoContainer>
         </div>
       )}
       {embed?.kind === "telegram" && (
-        <div className="mt-6 overflow-hidden rounded-lg border border-slate-200 p-2">
-          <TelegramEmbed postPath={embed.postPath} />
+        <div className="mt-6">
+          <VideoContainer>
+            <div className="p-2">
+              <TelegramEmbed postPath={embed.postPath} />
+            </div>
+          </VideoContainer>
         </div>
       )}
       {!embed && <p className="mt-6 text-sm text-red-600">Couldn&apos;t load this video link.</p>}
