@@ -16,18 +16,19 @@ export function WordForm({ categoryId }: { categoryId: string }) {
     const english = englishRef.current?.value ?? "";
     setError(null);
     startSuggesting(async () => {
-      try {
-        const suggestion = await suggestWord(english);
-        if (suggestion.uzbek && uzbekRef.current) uzbekRef.current.value = suggestion.uzbek;
-        if (suggestion.synonym && synonymRef.current) synonymRef.current.value = suggestion.synonym;
-        if (suggestion.difficulty && difficultyRef.current) {
-          difficultyRef.current.value = suggestion.difficulty;
-        }
-        if (suggestion.example_sentence && exampleRef.current) {
-          exampleRef.current.value = suggestion.example_sentence;
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Couldn't get an AI suggestion");
+      const result = await suggestWord(english);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      const { suggestion } = result;
+      if (suggestion.uzbek && uzbekRef.current) uzbekRef.current.value = suggestion.uzbek;
+      if (suggestion.synonym && synonymRef.current) synonymRef.current.value = suggestion.synonym;
+      if (suggestion.difficulty && difficultyRef.current) {
+        difficultyRef.current.value = suggestion.difficulty;
+      }
+      if (suggestion.example_sentence && exampleRef.current) {
+        exampleRef.current.value = suggestion.example_sentence;
       }
     });
   }

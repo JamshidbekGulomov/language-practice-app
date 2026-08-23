@@ -8,13 +8,27 @@ import { slugify } from "@/lib/slugify";
 import { suggestVocabWord, type VocabSuggestion } from "@/lib/ai/gemini";
 import type { VocabCategory, VocabWord } from "@/lib/vocabulary/types";
 
-/** AI-assisted first draft for a new word — admin reviews and edits before saving, this just saves the manual lookup. */
-export async function suggestWord(english: string): Promise<VocabSuggestion> {
+/**
+ * AI-assisted first draft for a new word — admin reviews and edits before
+ * saving, this just saves the manual lookup. Returns a result object
+ * rather than throwing: Next.js scrubs thrown Server Action error
+ * messages in production (generic "Server Components render" error with
+ * no detail), which would hide exactly the kind of message admins need
+ * to diagnose a missing/invalid API key.
+ */
+export async function suggestWord(
+  english: string,
+): Promise<{ ok: true; suggestion: VocabSuggestion } | { ok: false; error: string }> {
   const trimmed = english.trim();
-  if (!trimmed) throw new Error("Type the English word first");
+  if (!trimmed) return { ok: false, error: "Type the English word first" };
 
   await requireAdmin();
-  return suggestVocabWord(trimmed);
+  try {
+    const suggestion = await suggestVocabWord(trimmed);
+    return { ok: true, suggestion };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Couldn't get an AI suggestion" };
+  }
 }
 
 export async function createCategory(formData: FormData) {
