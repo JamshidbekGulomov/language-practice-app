@@ -10,6 +10,8 @@ A language-practice platform (listening, reading, vocabulary, writing, speaking,
 
 Live Supabase project ref: `uxtjjkmxkhhtnozuokpw`. Deployed from the `claude/language-platform-phase-0-wipphb` branch to the Vercel project `language-practice-app` (auto-deploys on push).
 
+**The homepage is organized into three tracks (`src/lib/tracks.ts`), not a flat module grid.** General English (`/general`) hosts the five non-exam-specific modules — Listening, Reading, Vocabulary, Writing, Translation — filtered from `MODULES` by slug. IELTS and CEFR link straight into that exam's Speaking practice (`/speaking/ielts`, `/speaking/cefr`) since Speaking is the only exam-specific content today; add more IELTS/CEFR modules by giving them their own hub pages later rather than overloading Speaking. `MODULES` (`src/lib/modules.ts`) still lists all six including Speaking — it's unchanged and still drives the admin dashboard/sidebar, since admin content management isn't reorganized by exam track. The old `/speaking` CEFR-or-IELTS chooser page still works as a direct link; it's just no longer linked from the homepage or footer.
+
 ## Commands
 
 ```bash

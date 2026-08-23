@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { MODULES } from "@/lib/modules";
+import { TRACKS } from "@/lib/tracks";
 
 export default function Home() {
   return (
-    <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6">
+    <div className="relative mx-auto max-w-5xl px-4 py-16 sm:px-6">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 -z-10 flex justify-center overflow-hidden"
@@ -19,28 +19,26 @@ export default function Home() {
           </span>
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-lg text-slate-500">
-          Six skills, one place. Pick a module below to get started.
+          Pick your track to get started.
         </p>
       </section>
 
-      <section className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {MODULES.map((m) => {
-          const Icon = m.icon;
+      <section className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-3">
+        {TRACKS.map((t) => {
+          const Icon = t.icon;
           return (
             <Link
-              key={m.slug}
-              href={`/${m.slug}`}
+              key={t.slug}
+              href={t.href}
               className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
             >
               <div
-                className={`inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${m.gradient} text-white shadow-sm`}
+                className={`inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${t.gradient} text-white shadow-sm`}
               >
                 <Icon className="h-6 w-6" />
               </div>
-              <h2 className="mt-4 text-xl font-bold text-slate-900">
-                {m.name}
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">{m.tagline}</p>
+              <h2 className="mt-4 text-xl font-bold text-slate-900">{t.name}</h2>
+              <p className="mt-1 text-sm text-slate-500">{t.tagline}</p>
               <span className="mt-4 inline-block text-sm font-semibold text-slate-400 transition group-hover:text-indigo-600">
                 Explore &rarr;
               </span>

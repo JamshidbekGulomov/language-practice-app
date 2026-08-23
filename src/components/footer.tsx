@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Send } from "lucide-react";
 import { siteConfig } from "@/lib/site-config";
-import { MODULES } from "@/lib/modules";
+import { TRACKS } from "@/lib/tracks";
 import { Brand } from "@/components/brand";
 
 export function Footer() {
@@ -26,13 +26,9 @@ export function Footer() {
         </div>
 
         <nav className="grid grid-cols-2 gap-x-8 gap-y-2 sm:grid-cols-3">
-          {MODULES.map((m) => (
-            <Link
-              key={m.slug}
-              href={`/${m.slug}`}
-              className="text-sm text-slate-600 hover:text-slate-900"
-            >
-              {m.name}
+          {TRACKS.map((t) => (
+            <Link key={t.slug} href={t.href} className="text-sm text-slate-600 hover:text-slate-900">
+              {t.name}
             </Link>
           ))}
           <Link href="/leaderboard" className="text-sm text-slate-600 hover:text-slate-900">
