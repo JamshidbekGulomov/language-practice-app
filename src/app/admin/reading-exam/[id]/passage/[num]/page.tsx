@@ -4,6 +4,14 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { PassageEditor } from "@/components/admin/reading-exam/passage-editor";
 import type { ReadingExamTest, ReadingExamPassage, ReadingExamWord } from "@/lib/reading-exam/types";
 
+/**
+ * Server Actions inherit the page's timeout, not the "use server" file's —
+ * the AI PDF analysis/word-suggestion actions call Gemini with a large
+ * multimodal prompt and can take well over the platform default (10-15s),
+ * which otherwise kills the request mid-flight with no usable error.
+ */
+export const maxDuration = 60;
+
 export default async function AdminReadingExamPassagePage({
   params,
 }: {

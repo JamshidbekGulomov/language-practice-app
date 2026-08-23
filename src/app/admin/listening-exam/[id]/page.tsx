@@ -7,6 +7,9 @@ import { updateSectionTranscript, deleteSection } from "@/app/admin/listening-ex
 import { EXAM_LABELS } from "@/lib/exam";
 import type { ListeningExamTest, ListeningExamSection } from "@/lib/listening-exam/types";
 
+/** Server Actions inherit the page's timeout — AI transcription can take longer than the platform default. */
+export const maxDuration = 60;
+
 export default async function AdminListeningExamTestPage({
   params,
 }: {
