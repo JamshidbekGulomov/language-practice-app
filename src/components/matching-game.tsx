@@ -21,11 +21,13 @@ function shuffle<T>(arr: T[]): T[] {
  */
 export function MatchingGame({
   pairs,
-  categorySlug,
+  backHref,
+  backLabel = "Back",
   onSubmitScore,
 }: {
   pairs: MatchingPair[];
-  categorySlug: string;
+  backHref: string;
+  backLabel?: string;
   onSubmitScore: (score: number, total: number) => Promise<void>;
 }) {
   const leftItems = useMemo(
@@ -88,11 +90,8 @@ export function MatchingGame({
         <p className="mt-4 text-sm text-slate-400">
           {isPending && !saved ? "Saving…" : saved ? "Score saved!" : ""}
         </p>
-        <Link
-          href={`/vocabulary/${categorySlug}`}
-          className="mt-8 inline-block text-sm text-slate-500 hover:underline"
-        >
-          ← Back to category
+        <Link href={backHref} className="mt-8 inline-block text-sm text-slate-500 hover:underline">
+          ← {backLabel}
         </Link>
       </div>
     );

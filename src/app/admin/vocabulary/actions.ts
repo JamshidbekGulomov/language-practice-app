@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { adminInsert, adminInsertMany, adminDelete } from "@/lib/admin/crud";
 import { requireAdmin } from "@/lib/supabase/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { slugify } from "@/lib/vocabulary/slugify";
+import { slugify } from "@/lib/slugify";
 import type { VocabCategory, VocabWord } from "@/lib/vocabulary/types";
 
 export async function createCategory(formData: FormData) {

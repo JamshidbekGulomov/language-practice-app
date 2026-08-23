@@ -28,10 +28,4 @@ export type VocabScore = {
   created_at: string;
 };
 
-export type LeaderboardRow = {
-  score: number;
-  total: number;
-  created_at: string;
-  display_name: string | null;
-  email: string;
-};
+export type { LeaderboardRow } from "@/lib/leaderboard";

@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCategoryBySlug, getWordsForCategory } from "@/lib/vocabulary/queries";
 import { getCurrentProfile } from "@/lib/supabase/get-profile";
 import { sample, MATCHING_ROUND_SIZE } from "@/lib/vocabulary/sample";
-import { MatchingGame } from "@/components/vocabulary/matching-game";
+import { MatchingGame } from "@/components/matching-game";
 import { submitScore } from "@/app/vocabulary/actions";
 
 export default async function VocabSynonymPage({
@@ -35,7 +35,12 @@ export default async function VocabSynonymPage({
       <h1 className="mb-8 text-center text-2xl font-extrabold tracking-tight text-slate-900">
         {category.name} — Synonym match
       </h1>
-      <MatchingGame pairs={pairs} categorySlug={slug} onSubmitScore={boundSubmit} />
+      <MatchingGame
+        pairs={pairs}
+        backHref={`/vocabulary/${slug}`}
+        backLabel="Back to category"
+        onSubmitScore={boundSubmit}
+      />
     </div>
   );
 }

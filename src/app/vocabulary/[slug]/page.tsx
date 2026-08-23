@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCategoryBySlug, getWordsForCategory } from "@/lib/vocabulary/queries";
+import {
+  getCategoryBySlug,
+  getWordsForCategory,
+  getLeaderboard,
+} from "@/lib/vocabulary/queries";
 import { getCurrentProfile } from "@/lib/supabase/get-profile";
-import { Leaderboard } from "@/components/vocabulary/leaderboard";
+import { Leaderboard } from "@/components/leaderboard";
 
 export default async function VocabCategoryPage({
   params,
@@ -13,9 +17,11 @@ export default async function VocabCategoryPage({
   const category = await getCategoryBySlug(slug);
   if (!category) notFound();
 
-  const [words, profile] = await Promise.all([
+  const [words, profile, matchingRows, synonymRows] = await Promise.all([
     getWordsForCategory(category.id),
     getCurrentProfile(),
+    getLeaderboard(category.id, "matching"),
+    getLeaderboard(category.id, "synonym"),
   ]);
 
   const synonymCount = words.filter((w) => w.synonym).length;
@@ -74,8 +80,8 @@ export default async function VocabCategoryPage({
       </div>
 
       <div className="mt-12 grid grid-cols-1 gap-8 sm:grid-cols-2">
-        <Leaderboard categoryId={category.id} mode="matching" title="Matching leaderboard" />
-        <Leaderboard categoryId={category.id} mode="synonym" title="Synonym match leaderboard" />
+        <Leaderboard rows={matchingRows} title="Matching leaderboard" />
+        <Leaderboard rows={synonymRows} title="Synonym match leaderboard" />
       </div>
     </div>
   );

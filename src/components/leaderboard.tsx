@@ -1,17 +1,6 @@
-import { getLeaderboard } from "@/lib/vocabulary/queries";
-import type { VocabGameMode } from "@/lib/vocabulary/types";
+import type { LeaderboardRow } from "@/lib/leaderboard";
 
-export async function Leaderboard({
-  categoryId,
-  mode,
-  title,
-}: {
-  categoryId: string;
-  mode: VocabGameMode;
-  title: string;
-}) {
-  const rows = await getLeaderboard(categoryId, mode);
-
+export function Leaderboard({ rows, title }: { rows: LeaderboardRow[]; title: string }) {
   return (
     <div>
       <h3 className="text-sm font-semibold text-slate-700">{title}</h3>
