@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isExam } from "@/lib/exam";
 import { SPEAKING_EXAMS } from "@/lib/speaking/exams";
-import { listPassages } from "@/lib/reading/queries";
+import { listTests } from "@/lib/reading-exam/queries";
 import { MODULES } from "@/lib/modules";
 
 export default async function ExamReadingPage({
@@ -16,7 +16,7 @@ export default async function ExamReadingPage({
   const mod = MODULES.find((m) => m.slug === "reading")!;
   const Icon = mod.icon;
   const label = SPEAKING_EXAMS[exam].label;
-  const passages = await listPassages({ exam });
+  const tests = await listTests(exam);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
@@ -29,25 +29,23 @@ export default async function ExamReadingPage({
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-900">
           {label} Reading
         </h1>
-        <p className="mt-2 text-slate-500">Pick a passage to start practicing.</p>
+        <p className="mt-2 text-slate-500">Pick a test to practice a passage, or take the full exam.</p>
       </div>
 
       <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {passages.length === 0 ? (
+        {tests.length === 0 ? (
           <p className="col-span-full text-center text-sm text-slate-400">
-            No passages yet — check back soon.
+            No reading tests yet — check back soon.
           </p>
         ) : (
-          passages.map((p) => (
+          tests.map((test) => (
             <Link
-              key={p.id}
-              href={`/reading/${p.slug}`}
+              key={test.id}
+              href={`/reading-exam/${test.slug}`}
               className="rounded-xl border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-md"
             >
-              <h2 className="font-bold text-slate-900">{p.title}</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                {p.wordCount} word{p.wordCount === 1 ? "" : "s"}
-              </p>
+              <h2 className="font-bold text-slate-900">{test.title}</h2>
+              <p className="mt-1 text-sm text-slate-500">3 passages + full exam</p>
             </Link>
           ))
         )}

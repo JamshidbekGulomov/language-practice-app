@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isExam } from "@/lib/exam";
 import { SPEAKING_EXAMS } from "@/lib/speaking/exams";
-import { listClips } from "@/lib/listening/queries";
+import { listTests } from "@/lib/listening-exam/queries";
 import { MODULES } from "@/lib/modules";
 
 export default async function ExamListeningPage({
@@ -16,7 +16,7 @@ export default async function ExamListeningPage({
   const mod = MODULES.find((m) => m.slug === "listening")!;
   const Icon = mod.icon;
   const label = SPEAKING_EXAMS[exam].label;
-  const clips = await listClips({ exam });
+  const tests = await listTests(exam);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
@@ -29,25 +29,23 @@ export default async function ExamListeningPage({
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-900">
           {label} Listening
         </h1>
-        <p className="mt-2 text-slate-500">Pick a clip to start practicing.</p>
+        <p className="mt-2 text-slate-500">Full listening tests — listen, read the transcript, and take notes.</p>
       </div>
 
       <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {clips.length === 0 ? (
+        {tests.length === 0 ? (
           <p className="col-span-full text-center text-sm text-slate-400">
-            No clips yet — check back soon.
+            No listening tests yet — check back soon.
           </p>
         ) : (
-          clips.map((c) => (
+          tests.map((test) => (
             <Link
-              key={c.id}
-              href={`/listening/${c.slug}`}
+              key={test.id}
+              href={`/listening-exam/${test.slug}`}
               className="rounded-xl border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-md"
             >
-              <h2 className="font-bold text-slate-900">{c.title}</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                {c.wordCount} word{c.wordCount === 1 ? "" : "s"}
-              </p>
+              <h2 className="font-bold text-slate-900">{test.title}</h2>
+              <p className="mt-1 text-sm text-slate-500">Full listening test</p>
             </Link>
           ))
         )}

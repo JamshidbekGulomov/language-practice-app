@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, FileText, Headphones as HeadphonesIcon } from "lucide-react";
 import { MODULES } from "@/lib/modules";
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   ...MODULES.map((m) => ({ href: `/admin/${m.slug}`, label: m.name, icon: m.icon })),
+  { href: "/admin/reading-exam", label: "Reading Exam", icon: FileText },
+  { href: "/admin/listening-exam", label: "Listening Exam", icon: HeadphonesIcon },
 ];
 
 export function AdminSidebar() {
