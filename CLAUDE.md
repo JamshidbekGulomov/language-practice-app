@@ -29,7 +29,7 @@ There is no test suite. Verification is: typecheck → `npm run build` → `npm 
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser + server | No |
 | `SUPABASE_SERVICE_ROLE_KEY` | server only, bypasses RLS | **Yes** |
 | `GEMINI_API_KEY` | server only (`src/lib/ai/gemini.ts`) | **Yes** |
-| `GEMINI_MODEL` | server only, defaults to `gemini-2.0-flash` | No |
+| `GEMINI_MODEL` | server only, defaults to `gemini-3.6-flash` | No |
 
 Local dev: `cp .env.local.example .env.local` and fill in values (gitignored). Production values live in Vercel's project env settings.
 
