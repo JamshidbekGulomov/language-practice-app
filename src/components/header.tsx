@@ -3,7 +3,7 @@ import { Send, ShieldCheck } from "lucide-react";
 import { getCurrentProfile } from "@/lib/supabase/get-profile";
 import { siteConfig } from "@/lib/site-config";
 import { SignOutButton } from "@/components/sign-out-button";
-import { NavControls } from "@/components/nav-controls";
+import { BackButton, HomeButton } from "@/components/nav-controls";
 
 export async function Header() {
   const profile = await getCurrentProfile();
@@ -11,8 +11,8 @@ export async function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-        <div className="flex items-center gap-2">
-          <NavControls />
+        <div className="flex items-center gap-3">
+          <BackButton />
           <Link
             href="/"
             className="bg-gradient-to-r from-indigo-600 to-fuchsia-600 bg-clip-text text-lg font-extrabold tracking-tight text-transparent"
@@ -65,6 +65,8 @@ export async function Header() {
               </Link>
             </div>
           )}
+
+          <HomeButton />
         </div>
       </div>
     </header>
