@@ -87,17 +87,33 @@ export async function updatePassage(passageId: string, input: PassageInput) {
   revalidatePath("/admin/reading-exam");
 }
 
-export async function createPdfUploadUrl(fileName: string) {
-  await requireAdmin();
-  const admin = createAdminClient();
+type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
-  const ext = fileName.includes(".") ? fileName.split(".").pop() : "pdf";
-  const path = `${randomUUID()}.${ext}`;
+/**
+ * Every AI-backed action below returns a result object instead of
+ * throwing: Next.js scrubs thrown Server Action error messages in
+ * production (a generic, detail-free error), which for a directly-awaited
+ * (non-form) action surfaces as a cryptic minified React error instead of
+ * anything admin can act on. Same fix as `suggestWord` in the vocabulary
+ * module.
+ */
+export async function createPdfUploadUrl(
+  fileName: string,
+): Promise<ActionResult<{ path: string; token: string }>> {
+  try {
+    await requireAdmin();
+    const admin = createAdminClient();
 
-  const { data, error } = await admin.storage.from(ADMIN_UPLOADS_BUCKET).createSignedUploadUrl(path);
-  if (error) throw new Error(error.message);
+    const ext = fileName.includes(".") ? fileName.split(".").pop() : "pdf";
+    const path = `${randomUUID()}.${ext}`;
 
-  return { path, token: data.token };
+    const { data, error } = await admin.storage.from(ADMIN_UPLOADS_BUCKET).createSignedUploadUrl(path);
+    if (error) return { ok: false, error: error.message };
+
+    return { ok: true, data: { path, token: data.token } };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Could not prepare the upload" };
+  }
 }
 
 export type PassageAiDraft = {
@@ -115,70 +131,84 @@ export type PassageAiDraft = {
  * this app's QuestionGroup shape, and deletes the temp upload. The admin
  * still has to hit "Save passage" — this only pre-fills the editor.
  */
-export async function analyzePassageWithAi(path: string): Promise<PassageAiDraft> {
-  await requireAdmin();
-  const admin = createAdminClient();
+export async function analyzePassageWithAi(path: string): Promise<ActionResult<PassageAiDraft>> {
+  try {
+    await requireAdmin();
+    const admin = createAdminClient();
 
-  const { data: file, error: downloadError } = await admin.storage.from(ADMIN_UPLOADS_BUCKET).download(path);
-  if (downloadError || !file) throw new Error(downloadError?.message || "Could not read the uploaded PDF");
+    const { data: file, error: downloadError } = await admin.storage.from(ADMIN_UPLOADS_BUCKET).download(path);
+    if (downloadError || !file) {
+      return { ok: false, error: downloadError?.message || "Could not read the uploaded PDF" };
+    }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const draft = await analyzeReadingExamPdf(buffer.toString("base64"));
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const draft = await analyzeReadingExamPdf(buffer.toString("base64"));
 
-  admin.storage.from(ADMIN_UPLOADS_BUCKET).remove([path]).catch(() => {});
+    admin.storage.from(ADMIN_UPLOADS_BUCKET).remove([path]).catch(() => {});
 
-  const question_groups: QuestionGroup[] = [];
-  if (draft.matching_headings.present) {
-    question_groups.push({
-      type: "matching_headings",
-      label: draft.matching_headings.label || "Matching Headings",
-      startQuestion: draft.matching_headings.startQuestion || 1,
-      headings: draft.matching_headings.headings,
-      items: draft.matching_headings.items.map((it, i) => ({
-        question: (draft.matching_headings.startQuestion || 1) + i,
-        paragraphLetter: it.paragraphLetter,
-        answerCode: it.answerCode,
-      })),
-    });
+    const question_groups: QuestionGroup[] = [];
+    if (draft.matching_headings.present) {
+      question_groups.push({
+        type: "matching_headings",
+        label: draft.matching_headings.label || "Matching Headings",
+        startQuestion: draft.matching_headings.startQuestion || 1,
+        headings: draft.matching_headings.headings,
+        items: draft.matching_headings.items.map((it, i) => ({
+          question: (draft.matching_headings.startQuestion || 1) + i,
+          paragraphLetter: it.paragraphLetter,
+          answerCode: it.answerCode,
+        })),
+      });
+    }
+    if (draft.matching_features.present) {
+      question_groups.push({
+        type: "matching_features",
+        label: draft.matching_features.label || "Matching Features",
+        startQuestion: draft.matching_features.startQuestion || 1,
+        statements: draft.matching_features.statements,
+        items: draft.matching_features.items.map((it, i) => ({
+          question: (draft.matching_features.startQuestion || 1) + i,
+          personOrFeature: it.personOrFeature,
+          answerCode: it.answerCode,
+        })),
+      });
+    }
+    if (draft.summary_completion.present) {
+      question_groups.push({
+        type: "summary_completion",
+        label: draft.summary_completion.label || "Summary Completion",
+        startQuestion: draft.summary_completion.startQuestion || 1,
+        title: draft.summary_completion.title,
+        text: draft.summary_completion.text,
+        answers: draft.summary_completion.answers,
+      });
+    }
+
+    return {
+      ok: true,
+      data: {
+        title: draft.title,
+        subtitle: draft.subtitle,
+        paragraphs: draft.paragraphs,
+        glossary: draft.glossary.map((g) => ({ word: g.word, def: g.def, syn: g.syn ?? "", uz: g.uz ?? "" })),
+        question_groups,
+        paraphrase_pairs: draft.paraphrase_pairs,
+      },
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "AI analysis failed" };
   }
-  if (draft.matching_features.present) {
-    question_groups.push({
-      type: "matching_features",
-      label: draft.matching_features.label || "Matching Features",
-      startQuestion: draft.matching_features.startQuestion || 1,
-      statements: draft.matching_features.statements,
-      items: draft.matching_features.items.map((it, i) => ({
-        question: (draft.matching_features.startQuestion || 1) + i,
-        personOrFeature: it.personOrFeature,
-        answerCode: it.answerCode,
-      })),
-    });
-  }
-  if (draft.summary_completion.present) {
-    question_groups.push({
-      type: "summary_completion",
-      label: draft.summary_completion.label || "Summary Completion",
-      startQuestion: draft.summary_completion.startQuestion || 1,
-      title: draft.summary_completion.title,
-      text: draft.summary_completion.text,
-      answers: draft.summary_completion.answers,
-    });
-  }
-
-  return {
-    title: draft.title,
-    subtitle: draft.subtitle,
-    paragraphs: draft.paragraphs,
-    glossary: draft.glossary.map((g) => ({ word: g.word, def: g.def, syn: g.syn ?? "", uz: g.uz ?? "" })),
-    question_groups,
-    paraphrase_pairs: draft.paraphrase_pairs,
-  };
 }
 
-export async function suggestWords(text: string): Promise<{ word: string; meaning: string }[]> {
-  await requireAdmin();
-  if (!text.trim()) return [];
-  return suggestWordsFromText(text);
+export async function suggestWords(text: string): Promise<ActionResult<{ word: string; meaning: string }[]>> {
+  try {
+    await requireAdmin();
+    if (!text.trim()) return { ok: true, data: [] };
+    const words = await suggestWordsFromText(text);
+    return { ok: true, data: words };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Couldn't get AI suggestions" };
+  }
 }
 
 export async function addWordsBulk(passageId: string, words: { word: string; meaning: string }[]) {

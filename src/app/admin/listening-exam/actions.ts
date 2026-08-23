@@ -73,16 +73,32 @@ export async function addSection(testId: string, formData: FormData) {
   revalidatePath(`/admin/listening-exam/${testId}`);
 }
 
-/** Transcribes audio already uploaded to the listening-audio bucket (before the section row even exists), so admin can review/edit before saving. */
-export async function transcribeUploadedAudio(path: string): Promise<string> {
-  await requireAdmin();
-  const admin = createAdminClient();
+/**
+ * Transcribes audio already uploaded to the listening-audio bucket (before
+ * the section row even exists), so admin can review/edit before saving.
+ * Returns a result object instead of throwing: Next.js scrubs thrown
+ * Server Action error messages in production, which for a
+ * directly-awaited (non-form) action surfaces as a cryptic minified React
+ * error instead of anything admin can act on.
+ */
+export async function transcribeUploadedAudio(
+  path: string,
+): Promise<{ ok: true; transcript: string } | { ok: false; error: string }> {
+  try {
+    await requireAdmin();
+    const admin = createAdminClient();
 
-  const { data: file, error: downloadError } = await admin.storage.from(LISTENING_AUDIO_BUCKET).download(path);
-  if (downloadError || !file) throw new Error(downloadError?.message || "Could not read the uploaded audio");
+    const { data: file, error: downloadError } = await admin.storage.from(LISTENING_AUDIO_BUCKET).download(path);
+    if (downloadError || !file) {
+      return { ok: false, error: downloadError?.message || "Could not read the uploaded audio" };
+    }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  return transcribeAudio(buffer.toString("base64"), file.type || "audio/mpeg");
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const transcript = await transcribeAudio(buffer.toString("base64"), file.type || "audio/mpeg");
+    return { ok: true, transcript };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Transcription failed" };
+  }
 }
 
 export async function updateSectionTranscript(sectionId: string, testId: string, formData: FormData) {

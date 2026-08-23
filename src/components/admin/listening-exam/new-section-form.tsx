@@ -36,8 +36,12 @@ export function NewSectionForm({ testId, nextSectionNumber }: { testId: string; 
       setProgress("Uploading audio…");
       const path = await ensureUploaded();
       setProgress("Transcribing with AI…");
-      const text = await transcribeUploadedAudio(path);
-      setTranscript(text || "");
+      const result = await transcribeUploadedAudio(path);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setTranscript(result.transcript || "");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Transcription failed");
     } finally {

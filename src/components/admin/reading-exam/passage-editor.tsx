@@ -162,12 +162,25 @@ export function PassageEditor({
     setAiPending(true);
     try {
       setAiProgress("Uploading PDF…");
-      const { path, token } = await createPdfUploadUrl(file.name);
+      const uploadUrlResult = await createPdfUploadUrl(file.name);
+      if (!uploadUrlResult.ok) {
+        setAiError(uploadUrlResult.error);
+        return;
+      }
+      const { path, token } = uploadUrlResult.data;
       const { error: uploadError } = await supabase.storage.from("admin-uploads").uploadToSignedUrl(path, token, file);
-      if (uploadError) throw new Error(uploadError.message);
+      if (uploadError) {
+        setAiError(uploadError.message);
+        return;
+      }
 
       setAiProgress("Reading passage and questions with AI… this can take a minute");
-      const draft = await analyzePassageWithAi(path);
+      const result = await analyzePassageWithAi(path);
+      if (!result.ok) {
+        setAiError(result.error);
+        return;
+      }
+      const draft = result.data;
 
       if (draft.title) setTitle(draft.title);
       if (draft.subtitle) setSubtitle(draft.subtitle);
@@ -206,8 +219,12 @@ export function PassageEditor({
     setSuggestingWords(true);
     try {
       const text = paragraphs.map((p) => p.text).join("\n\n");
-      const words = await suggestWords(text);
-      setWordSuggestions(words.map((w) => ({ ...w, checked: true })));
+      const result = await suggestWords(text);
+      if (!result.ok) {
+        setWordSuggestError(result.error);
+        return;
+      }
+      setWordSuggestions(result.data.map((w) => ({ ...w, checked: true })));
     } catch (err) {
       setWordSuggestError(err instanceof Error ? err.message : "Suggestion failed");
     } finally {
