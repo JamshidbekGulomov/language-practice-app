@@ -31,7 +31,7 @@ export async function createUploadUrl(extension: string) {
   return { path, token: data.token };
 }
 
-export async function submitRecording(topicId: string, topicSlug: string, audioPath: string) {
+export async function submitRecording(topicId: string, topicPath: string, audioPath: string) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -45,7 +45,7 @@ export async function submitRecording(topicId: string, topicSlug: string, audioP
   });
   if (error) throw new Error(error.message);
 
-  revalidatePath(`/speaking/${topicSlug}`);
+  revalidatePath(topicPath);
 }
 
 /** Verifies ownership server-side, then writes via the service-role client — no student UPDATE RLS policy exists on this table. */
@@ -71,13 +71,13 @@ async function updateOwnSubmission(submissionId: string, values: Record<string, 
   if (error) throw new Error(error.message);
 }
 
-export async function markSelfChecked(topicSlug: string, submissionId: string) {
+export async function markSelfChecked(topicPath: string, submissionId: string) {
   await updateOwnSubmission(submissionId, { self_checked: true });
-  revalidatePath(`/speaking/${topicSlug}`);
+  revalidatePath(topicPath);
 }
 
-export async function sendToTeacher(topicSlug: string, submissionId: string) {
+export async function sendToTeacher(topicPath: string, submissionId: string) {
   await updateOwnSubmission(submissionId, { sent_to_teacher: true });
-  revalidatePath(`/speaking/${topicSlug}`);
+  revalidatePath(topicPath);
   revalidatePath("/admin/speaking/review");
 }

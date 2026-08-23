@@ -1,7 +1,16 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
-import { getTopicBySlug, getQuestions, getHints, getMySubmission } from "@/lib/speaking/queries";
+import {
+  getTopicBySlug,
+  getQuestions,
+  getHints,
+  getImages,
+  getMySubmission,
+} from "@/lib/speaking/queries";
 import { getCurrentProfile } from "@/lib/supabase/get-profile";
+import { getSpeakingImageUrl } from "@/lib/speaking/storage";
+import { getPartDef, isSpeakingExam } from "@/lib/speaking/exams";
 import { AudioRecorder } from "@/components/speaking/audio-recorder";
 import { SubmissionPanel } from "@/components/speaking/submission-panel";
 import { markSelfChecked, sendToTeacher } from "@/app/speaking/actions";
@@ -9,31 +18,57 @@ import { markSelfChecked, sendToTeacher } from "@/app/speaking/actions";
 export default async function SpeakingTopicPage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ exam: string; slug: string }>;
 }) {
-  const { slug } = await params;
-  const topic = await getTopicBySlug(slug);
-  if (!topic) notFound();
+  const { exam, slug } = await params;
+  if (!isSpeakingExam(exam)) notFound();
 
-  const [profile, questions, hints, submission] = await Promise.all([
+  const topic = await getTopicBySlug(slug);
+  if (!topic || topic.exam !== exam) notFound();
+
+  const partDef = getPartDef(topic.exam, topic.part);
+  const topicPath = `/speaking/${exam}/${slug}`;
+
+  const [profile, questions, hints, images, submission] = await Promise.all([
     getCurrentProfile(),
     getQuestions(topic.id),
     getHints(topic.id),
+    topic.format === "images" ? getImages(topic.id) : Promise.resolve([]),
     getMySubmission(topic.id),
   ]);
 
-  const boundMarkSelfChecked = markSelfChecked.bind(null, slug);
-  const boundSendToTeacher = sendToTeacher.bind(null, slug);
+  const boundMarkSelfChecked = markSelfChecked.bind(null, topicPath);
+  const boundSendToTeacher = sendToTeacher.bind(null, topicPath);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
-      <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">{topic.title}</h1>
+      <Link href={`/speaking/${exam}`} className="text-sm font-medium text-sky-600 hover:underline">
+        ← {partDef?.label ?? topic.part}
+      </Link>
+
+      <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">{topic.title}</h1>
       <p className="mt-3 text-slate-700">{topic.prompt}</p>
+
+      {topic.format === "images" && images.length > 0 && (
+        <div className={`mt-6 grid gap-3 ${images.length > 1 ? "sm:grid-cols-2" : "grid-cols-1"}`}>
+          {images.map((img) => (
+            <div key={img.id} className="overflow-hidden rounded-xl border border-slate-200">
+              <Image
+                src={getSpeakingImageUrl(img.image_path)}
+                alt=""
+                width={600}
+                height={450}
+                className="h-auto w-full object-cover"
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       {questions.length > 0 && (
         <div className="mt-6">
           <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">
-            Guided questions
+            {topic.format === "qa" ? "Questions" : "Guided questions"}
           </h2>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
             {questions.map((q) => (
@@ -82,7 +117,7 @@ export default async function SpeakingTopicPage({
                 onSendToTeacher={boundSendToTeacher}
               />
             ) : (
-              <AudioRecorder topicId={topic.id} topicSlug={slug} />
+              <AudioRecorder topicId={topic.id} topicPath={topicPath} />
             )}
           </div>
         </div>

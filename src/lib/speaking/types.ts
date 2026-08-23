@@ -1,8 +1,13 @@
+import type { SpeakingExam, SpeakingFormat } from "@/lib/speaking/exams";
+
 export type SpeakingTopic = {
   id: string;
   title: string;
   slug: string;
   prompt: string;
+  exam: SpeakingExam;
+  part: string;
+  format: SpeakingFormat;
   created_at: string;
 };
 
@@ -18,6 +23,14 @@ export type SpeakingHint = {
   topic_id: string;
   word: string;
   meaning: string | null;
+  created_at: string;
+};
+
+export type SpeakingImage = {
+  id: string;
+  topic_id: string;
+  image_path: string;
+  position: number;
   created_at: string;
 };
 

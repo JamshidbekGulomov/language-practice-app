@@ -14,7 +14,7 @@ function pickExtension(mimeType: string): string {
   return "webm";
 }
 
-export function AudioRecorder({ topicId, topicSlug }: { topicId: string; topicSlug: string }) {
+export function AudioRecorder({ topicId, topicPath }: { topicId: string; topicPath: string }) {
   const router = useRouter();
   const supabase = createClient();
   const [status, setStatus] = useState<Status>("idle");
@@ -74,7 +74,7 @@ export function AudioRecorder({ topicId, topicSlug }: { topicId: string; topicSl
         .uploadToSignedUrl(path, token, blob);
       if (uploadError) throw new Error(uploadError.message);
 
-      await submitRecording(topicId, topicSlug, path);
+      await submitRecording(topicId, topicPath, path);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");

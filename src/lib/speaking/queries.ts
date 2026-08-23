@@ -1,13 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPEAKING_AUDIO_BUCKET } from "@/lib/speaking/storage";
-import type { SpeakingTopic, SpeakingQuestion, SpeakingHint, SpeakingSubmission } from "@/lib/speaking/types";
+import type { SpeakingExam } from "@/lib/speaking/exams";
+import type {
+  SpeakingTopic,
+  SpeakingQuestion,
+  SpeakingHint,
+  SpeakingImage,
+  SpeakingSubmission,
+} from "@/lib/speaking/types";
 
-export async function listTopics(): Promise<SpeakingTopic[]> {
+export async function listTopicsByExam(exam: SpeakingExam): Promise<SpeakingTopic[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("speaking_topics")
     .select("*")
+    .eq("exam", exam)
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   return data ?? [];
@@ -41,6 +49,17 @@ export async function getHints(topicId: string): Promise<SpeakingHint[]> {
     .select("*")
     .eq("topic_id", topicId)
     .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function getImages(topicId: string): Promise<SpeakingImage[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("speaking_images")
+    .select("*")
+    .eq("topic_id", topicId)
+    .order("position", { ascending: true });
   if (error) throw new Error(error.message);
   return data ?? [];
 }
