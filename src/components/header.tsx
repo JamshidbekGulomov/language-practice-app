@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Send, ShieldCheck } from "lucide-react";
+import { Send, ShieldCheck, Trophy } from "lucide-react";
 import { getCurrentProfile } from "@/lib/supabase/get-profile";
 import { siteConfig } from "@/lib/site-config";
 import { SignOutButton } from "@/components/sign-out-button";
 import { BackButton, HomeButton } from "@/components/nav-controls";
+import { Brand } from "@/components/brand";
 
 export async function Header() {
   const profile = await getCurrentProfile();
@@ -13,15 +14,20 @@ export async function Header() {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
         <div className="flex items-center gap-3">
           <BackButton />
-          <Link
-            href="/"
-            className="bg-gradient-to-r from-indigo-600 to-fuchsia-600 bg-clip-text text-lg font-extrabold tracking-tight text-transparent"
-          >
-            {siteConfig.name}
+          <Link href="/">
+            <Brand />
           </Link>
         </div>
 
         <div className="flex items-center gap-4">
+          <Link
+            href="/leaderboard"
+            className="hidden items-center gap-1.5 text-sm font-medium text-amber-600 hover:text-amber-700 sm:flex"
+          >
+            <Trophy className="h-4 w-4" />
+            Leaderboard
+          </Link>
+
           <a
             href={siteConfig.telegramUrl}
             target="_blank"

@@ -44,7 +44,7 @@ Three Supabase client variants (`src/lib/supabase/`):
 - `server.ts` — request-scoped server client using cookies; respects RLS as the signed-in user. Used for all public reads and student writes (scores, submissions).
 - `admin.ts` — `createAdminClient()`, service-role key, bypasses RLS entirely. Used only inside admin Server Actions, always after `requireAdmin()`.
 
-Public content tables (categories/words/clips/passages/lessons) have `select` RLS policies open to `anon, authenticated`; there are deliberately no write policies for them — all admin writes go through the service-role client instead, gated by `requireAdmin()` in code rather than RLS.
+Public content tables (categories/words/clips/passages/lessons) have `select` RLS policies open to `anon, authenticated`; there are deliberately no write policies for them — all admin writes go through the service-role client instead, gated by `requireAdmin()` in code rather than RLS. Scores and `profiles` themselves are the exception: their `select` policies are scoped to `authenticated` only (not `anon`), so leaderboards — including the global one below — only populate for signed-in visitors; a logged-out visitor sees an empty board, not an error.
 
 ## The module pattern
 
@@ -54,6 +54,8 @@ Vocabulary, Listening, and Reading are structurally identical and share code —
 - **Admin**: `/admin/<module>` list+create, `/admin/<module>/[id]` detail page managing that item's words (single-add form + CSV/XLSX bulk upload parsed client-side via `xlsx`).
 - **Public**: `/<module>` list, `/<module>/[slug]` detail with a game-mode picker + leaderboards, `/<module>/[slug]/<mode>` game pages. Games require login (`getCurrentProfile()` → `redirect("/login")` if absent); browsing does not.
 - **Shared building blocks** (`src/components/`, `src/lib/`) used across all three: `MatchingGame`, `MultipleChoiceGame`, `FillBlankGame`, `Leaderboard`, plus `build-mc-questions.ts`, `fill-blank.ts`, `sample.ts` (`MATCHING_ROUND_SIZE`), `slugify.ts`, `leaderboard.ts` (the `LeaderboardRow` type). If a game mechanic needs to change, it usually belongs here, not in one module — a fix in `MatchingGame` affects Vocabulary, Listening, and Reading at once.
+
+`leaderboard.ts` also exports `getGlobalLeaderboard()`, backing `/leaderboard` — "diamonds" are just `score` (correct answers) summed across `vocab_scores` + `listening_scores` + `reading_scores` per user. No new table: it runs three plain selects (each with the same `profiles(display_name, email)` embed the per-category leaderboards already use) and reduces them into totals in JS, since PostgREST can't aggregate across tables in one request. Fine at this scale; would need a real SQL view if the row counts ever got large.
 
 **Writing is intentionally different**: it's a linear flow (watch video → gap-fill unlocks sentence-construction) with no public leaderboard — `writing_gap_fill_results` and `writing_sentence_submissions` are private to the student and the admin (via a review queue at `/admin/writing/review`, service-role client, no student update policy). Sentence-submission mutations (self-check, send-to-teacher) go through Server Actions that manually re-verify `auth.uid()` ownership before writing with the service-role client, rather than relying on an RLS update policy.
 

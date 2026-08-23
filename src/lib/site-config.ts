@@ -1,4 +1,4 @@
 export const siteConfig = {
-  name: "LinguaPractice",
+  name: "English with Jamshidbek",
   telegramUrl: "https://t.me/IELTS_Jamshidbek",
 };
