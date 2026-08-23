@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { adminList } from "@/lib/admin/crud";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { DataTable } from "@/components/admin/data-table";
+import { VocabCategoriesTable } from "@/components/admin/vocab/vocab-categories-table";
 import { createCategory, deleteCategory } from "@/app/admin/vocabulary/actions";
 import type { VocabCategory, VocabWord } from "@/lib/vocabulary/types";
 
@@ -41,23 +40,7 @@ export default async function AdminVocabularyPage() {
         </button>
       </form>
 
-      <DataTable
-        columns={[
-          {
-            key: "name",
-            label: "Name",
-            render: (row) => (
-              <Link href={`/admin/vocabulary/${row.id}`} className="font-medium text-slate-900 hover:underline">
-                {row.name}
-              </Link>
-            ),
-          },
-          { key: "wordCount", label: "Words" },
-        ]}
-        rows={rows}
-        onDelete={deleteCategory}
-        emptyMessage="No categories yet — create one above."
-      />
+      <VocabCategoriesTable rows={rows} onDelete={deleteCategory} />
     </div>
   );
 }

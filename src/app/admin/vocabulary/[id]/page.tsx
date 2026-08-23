@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { adminList } from "@/lib/admin/crud";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { DataTable } from "@/components/admin/data-table";
+import { VocabWordsTable } from "@/components/admin/vocab/vocab-words-table";
 import { WordUploadForm } from "@/components/admin/vocab/word-upload-form";
 import { addWord, deleteWord } from "@/app/admin/vocabulary/actions";
 import type { VocabCategory, VocabWord } from "@/lib/vocabulary/types";
@@ -71,17 +71,7 @@ export default async function AdminVocabCategoryPage({
       </form>
 
       <div className="mt-6">
-        <DataTable
-          columns={[
-            { key: "english", label: "English" },
-            { key: "uzbek", label: "Uzbek" },
-            { key: "synonym", label: "Synonym", render: (w) => w.synonym ?? "—" },
-            { key: "difficulty", label: "Difficulty", render: (w) => w.difficulty ?? "—" },
-          ]}
-          rows={words}
-          onDelete={deleteWord.bind(null, id)}
-          emptyMessage="No words yet — add one above or bulk upload a file."
-        />
+        <VocabWordsTable rows={words} onDelete={deleteWord.bind(null, id)} />
       </div>
     </div>
   );
