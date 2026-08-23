@@ -113,7 +113,7 @@ export function MatchingGame({
                 matched.has(item.id)
                   ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                   : selectedLeft === item.id
-                    ? "border-slate-900 bg-slate-900 text-white"
+                    ? "border-indigo-600 bg-indigo-600 text-white"
                     : wrong?.left === item.id
                       ? "border-red-300 bg-red-50 text-red-600"
                       : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"

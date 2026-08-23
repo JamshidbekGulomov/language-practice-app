@@ -3,11 +3,18 @@ import { MODULES } from "@/lib/modules";
 
 export default function Home() {
   return (
-    <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+    <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 flex justify-center overflow-hidden"
+      >
+        <div className="h-[420px] w-[720px] rounded-full bg-gradient-to-r from-indigo-400 via-fuchsia-400 to-amber-300 opacity-20 blur-3xl" />
+      </div>
+
       <section className="text-center">
         <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">
           Practice a little,{" "}
-          <span className="bg-gradient-to-r from-sky-500 to-violet-600 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-indigo-600 via-fuchsia-600 to-amber-500 bg-clip-text text-transparent">
             every day
           </span>
         </h1>
@@ -34,7 +41,7 @@ export default function Home() {
                 {m.name}
               </h2>
               <p className="mt-1 text-sm text-slate-500">{m.tagline}</p>
-              <span className="mt-4 inline-block text-sm font-semibold text-slate-400 transition group-hover:text-slate-700">
+              <span className="mt-4 inline-block text-sm font-semibold text-slate-400 transition group-hover:text-indigo-600">
                 Explore &rarr;
               </span>
             </Link>

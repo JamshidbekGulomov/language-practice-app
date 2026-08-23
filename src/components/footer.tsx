@@ -8,7 +8,7 @@ export function Footer() {
     <footer className="border-t border-slate-200 bg-slate-50">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6 md:flex-row md:justify-between">
         <div>
-          <p className="text-lg font-extrabold tracking-tight text-slate-900">
+          <p className="bg-gradient-to-r from-indigo-600 to-fuchsia-600 bg-clip-text text-lg font-extrabold tracking-tight text-transparent">
             {siteConfig.name}
           </p>
           <p className="mt-1 max-w-xs text-sm text-slate-500">

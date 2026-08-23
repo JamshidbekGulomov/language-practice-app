@@ -155,7 +155,7 @@ export function AudioRecorder({
       {status === "idle" && (
         <button
           onClick={start}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+          className="rounded-lg bg-gradient-to-r from-indigo-600 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white transition hover:from-indigo-500 hover:to-fuchsia-500"
         >
           {prepSeconds ? `Start (${prepSeconds}s to prepare)` : "Start recording"}
         </button>
@@ -189,7 +189,7 @@ export function AudioRecorder({
             <button
               onClick={submit}
               disabled={status !== "recorded"}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+              className="rounded-lg bg-gradient-to-r from-indigo-600 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white transition hover:from-indigo-500 hover:to-fuchsia-500 disabled:opacity-50"
             >
               {status === "uploading"
                 ? "Submitting…"

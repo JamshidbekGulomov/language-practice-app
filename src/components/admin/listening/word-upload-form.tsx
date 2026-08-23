@@ -75,7 +75,7 @@ export function ListeningWordUploadForm({ clipId }: { clipId: string }) {
           if (file) handleFile(file);
           e.target.value = "";
         }}
-        className="mt-3 block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-700"
+        className="mt-3 block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-600 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500"
       />
       {isPending && <p className="mt-2 text-xs text-slate-500">Importing…</p>}
       {message && <p className="mt-2 text-xs text-emerald-600">{message}</p>}
