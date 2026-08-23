@@ -34,8 +34,8 @@ export default async function AdminWritingPage() {
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />
         <input
-          name="youtube_url"
-          placeholder="YouTube link (unlisted)"
+          name="video_url"
+          placeholder="Video link (YouTube unlisted, or a Telegram channel post)"
           required
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />

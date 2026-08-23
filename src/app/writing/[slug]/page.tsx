@@ -8,9 +8,10 @@ import {
   getMySubmissions,
 } from "@/lib/writing/queries";
 import { getCurrentProfile } from "@/lib/supabase/get-profile";
-import { getYouTubeEmbedUrl } from "@/lib/writing/youtube";
+import { getVideoEmbed } from "@/lib/writing/video-embed";
 import { GapFillExercises } from "@/components/writing/gap-fill-exercises";
 import { SentenceExercises } from "@/components/writing/sentence-exercises";
+import { TelegramEmbed } from "@/components/writing/telegram-embed";
 import { submitGapFillResult, submitSentence, markSelfChecked, sendToTeacher } from "@/app/writing/actions";
 
 export default async function WritingLessonPage({
@@ -31,7 +32,7 @@ export default async function WritingLessonPage({
       getMySubmissions(lesson.id),
     ]);
 
-  const embedUrl = getYouTubeEmbedUrl(lesson.youtube_url);
+  const embed = getVideoEmbed(lesson.video_url);
   const submissions = Object.fromEntries(submissionsMap);
 
   const boundSubmitScore = submitGapFillResult.bind(null, lesson.id, slug);
@@ -44,19 +45,23 @@ export default async function WritingLessonPage({
       <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">{lesson.title}</h1>
       {lesson.description && <p className="mt-1 text-slate-500">{lesson.description}</p>}
 
-      {embedUrl ? (
+      {embed?.kind === "youtube" && (
         <div className="mt-6 aspect-video w-full overflow-hidden rounded-lg border border-slate-200">
           <iframe
-            src={embedUrl}
+            src={embed.embedUrl}
             title={lesson.title}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
             className="h-full w-full"
           />
         </div>
-      ) : (
-        <p className="mt-6 text-sm text-red-600">Couldn&apos;t load this video link.</p>
       )}
+      {embed?.kind === "telegram" && (
+        <div className="mt-6 overflow-hidden rounded-lg border border-slate-200 p-2">
+          <TelegramEmbed postPath={embed.postPath} />
+        </div>
+      )}
+      {!embed && <p className="mt-6 text-sm text-red-600">Couldn&apos;t load this video link.</p>}
 
       {!profile && (
         <p className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">

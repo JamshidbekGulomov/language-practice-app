@@ -5,6 +5,7 @@ import { adminInsert, adminUpdate, adminDelete } from "@/lib/admin/crud";
 import { requireAdmin } from "@/lib/supabase/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/slugify";
+import { getVideoEmbed } from "@/lib/writing/video-embed";
 import type {
   WritingLesson,
   GapFillExercise,
@@ -13,11 +14,14 @@ import type {
 
 export async function createLesson(formData: FormData) {
   const title = (formData.get("title") as string)?.trim();
-  const youtube_url = (formData.get("youtube_url") as string)?.trim();
+  const video_url = (formData.get("video_url") as string)?.trim();
   const description = ((formData.get("description") as string) || "").trim() || null;
 
   if (!title) throw new Error("Title is required");
-  if (!youtube_url) throw new Error("YouTube link is required");
+  if (!video_url) throw new Error("Video link is required");
+  if (!getVideoEmbed(video_url)) {
+    throw new Error("That doesn't look like a YouTube or Telegram post link");
+  }
 
   await requireAdmin();
   const admin = createAdminClient();
@@ -39,7 +43,7 @@ export async function createLesson(formData: FormData) {
   await adminInsert<WritingLesson>("writing_lessons", {
     title,
     slug,
-    youtube_url,
+    video_url,
     description,
   });
   revalidatePath("/admin/writing");
@@ -53,11 +57,14 @@ export async function deleteLesson(id: string) {
 }
 
 export async function updateLesson(lessonId: string, formData: FormData) {
-  const youtube_url = (formData.get("youtube_url") as string)?.trim();
+  const video_url = (formData.get("video_url") as string)?.trim();
   const description = ((formData.get("description") as string) || "").trim() || null;
-  if (!youtube_url) throw new Error("YouTube link is required");
+  if (!video_url) throw new Error("Video link is required");
+  if (!getVideoEmbed(video_url)) {
+    throw new Error("That doesn't look like a YouTube or Telegram post link");
+  }
 
-  await adminUpdate<WritingLesson>("writing_lessons", lessonId, { youtube_url, description });
+  await adminUpdate<WritingLesson>("writing_lessons", lessonId, { video_url, description });
   revalidatePath(`/admin/writing/${lessonId}`);
   revalidatePath("/writing");
 }

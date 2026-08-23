@@ -2,7 +2,7 @@ export type WritingLesson = {
   id: string;
   title: string;
   slug: string;
-  youtube_url: string;
+  video_url: string;
   description: string | null;
   created_at: string;
 };

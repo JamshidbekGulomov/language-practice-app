@@ -44,10 +44,10 @@ export default async function AdminWritingLessonPage({
         action={updateLesson.bind(null, id)}
         className="space-y-3 rounded-lg border border-slate-200 p-4"
       >
-        <label className="text-sm font-medium text-slate-700">YouTube link</label>
+        <label className="text-sm font-medium text-slate-700">Video link (YouTube or Telegram)</label>
         <input
-          name="youtube_url"
-          defaultValue={lesson.youtube_url}
+          name="video_url"
+          defaultValue={lesson.video_url}
           required
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />
