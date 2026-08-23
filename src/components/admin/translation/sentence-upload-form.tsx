@@ -1,0 +1,86 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import * as XLSX from "xlsx";
+import { bulkImportSentences, type BulkTranslationSentenceRow } from "@/app/admin/translation/actions";
+
+const HEADER_ALIASES: Record<string, keyof BulkTranslationSentenceRow> = {
+  uzbek: "uzbek_text",
+  uzbek_text: "uzbek_text",
+  sentence: "uzbek_text",
+  model_answer: "model_answer",
+  answer: "model_answer",
+  english: "model_answer",
+};
+
+function parseRows(raw: Record<string, unknown>[]): BulkTranslationSentenceRow[] {
+  return raw.map((row) => {
+    const mapped: BulkTranslationSentenceRow = { uzbek_text: "" };
+    for (const [key, value] of Object.entries(row)) {
+      const field = HEADER_ALIASES[key.trim().toLowerCase()];
+      if (field && value != null) {
+        mapped[field] = String(value).trim();
+      }
+    }
+    return mapped;
+  });
+}
+
+export function SentenceUploadForm({ levelId }: { levelId: string }) {
+  const [isPending, startTransition] = useTransition();
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  function handleFile(file: File) {
+    setError(null);
+    setMessage(null);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result as ArrayBuffer;
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+        const rows = parseRows(raw);
+
+        startTransition(async () => {
+          try {
+            const result = await bulkImportSentences(levelId, rows);
+            setMessage(
+              `Imported ${result.imported} sentence(s)${
+                result.skipped ? `, skipped ${result.skipped} invalid row(s)` : ""
+              }.`,
+            );
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Import failed");
+          }
+        });
+      } catch {
+        setError("Couldn't read that file. Make sure it's a valid CSV or XLSX.");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  return (
+    <div className="rounded-lg border border-slate-200 p-4">
+      <p className="text-sm font-medium text-slate-700">Bulk upload (CSV or XLSX)</p>
+      <p className="mt-1 text-xs text-slate-500">Columns: Uzbek (required), Model answer (optional).</p>
+      <input
+        type="file"
+        accept=".csv,.xlsx,.xls"
+        disabled={isPending}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFile(file);
+          e.target.value = "";
+        }}
+        className="mt-3 block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-700"
+      />
+      {isPending && <p className="mt-2 text-xs text-slate-500">Importing…</p>}
+      {message && <p className="mt-2 text-xs text-emerald-600">{message}</p>}
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}

@@ -66,7 +66,7 @@ The three formats are three distinct **practice mechanics**, not just different 
 
 Images (capped the same way, via `addImage`) live in `speaking_images`, in a **public** `speaking-images` bucket (admin-authored content, not personal, so no signed URLs needed) uploaded via the same signed-upload-URL flow as audio. Rendering them through `next/image` required whitelisting the Supabase Storage host in `next.config.ts`'s `images.remotePatterns`, derived from `NEXT_PUBLIC_SUPABASE_URL` at build time.
 
-Translation is still a placeholder (`src/components/admin/admin-module-placeholder.tsx` on the admin side, `src/components/module-landing.tsx` on the public side).
+**Translation follows the Writing shape too** — it's the same linear, self-check + send-to-teacher pattern, just with translation sentences instead of a video lesson: `translation_levels` (`title` + `slug` + `description`, e.g. "Beginner", "A2") group `translation_sentences` (`uzbek_text` + optional `model_answer`), and `translation_submissions` is the student's English translation of one sentence — private, reviewed at `/admin/translation/review`, same manual-ownership-check-then-service-role-write mutations as `writing_sentence_submissions`. `src/components/translation/sentence-exercises.tsx` is a near-exact copy of Writing's `SentenceExercises` (a textarea instead of building from given words). Unlike Writing, there's no unlock gate — all sentences in a level are open at once, since there's no separate exercise-that-precedes-it. Bulk CSV/XLSX upload for sentences follows the same `xlsx`-in-a-`"use client"`-component pattern as the other modules' word lists.
 
 ## AI assist (Gemini, optional)
 
