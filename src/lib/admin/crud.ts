@@ -12,12 +12,22 @@ import { requireAdmin } from "@/lib/supabase/require-admin";
 
 export async function adminList<T>(
   table: string,
-  options?: { orderBy?: string; ascending?: boolean; select?: string },
+  options?: {
+    orderBy?: string;
+    ascending?: boolean;
+    select?: string;
+    eq?: Record<string, string | number>;
+  },
 ): Promise<T[]> {
   await requireAdmin();
   const admin = createAdminClient();
 
   let query = admin.from(table).select(options?.select ?? "*");
+  if (options?.eq) {
+    for (const [column, value] of Object.entries(options.eq)) {
+      query = query.eq(column, value);
+    }
+  }
   if (options?.orderBy) {
     query = query.order(options.orderBy, { ascending: options?.ascending ?? true });
   }
@@ -37,6 +47,18 @@ export async function adminInsert<T>(
   const { data, error } = await admin.from(table).insert(values).select().single();
   if (error) throw new Error(error.message);
   return data as T;
+}
+
+export async function adminInsertMany<T>(
+  table: string,
+  values: Record<string, unknown>[],
+): Promise<T[]> {
+  await requireAdmin();
+  const admin = createAdminClient();
+
+  const { data, error } = await admin.from(table).insert(values).select();
+  if (error) throw new Error(error.message);
+  return data as T[];
 }
 
 export async function adminUpdate<T>(
