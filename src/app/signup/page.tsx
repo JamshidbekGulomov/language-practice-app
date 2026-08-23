@@ -10,7 +10,7 @@ export default function SignupPage() {
         Sign up
       </h1>
       <p className="mt-1 text-sm text-slate-500">
-        Create an account to save your scores and progress.
+        Just pick a username and password — no email needed.
       </p>
 
       <div className="mt-6">
@@ -23,7 +23,12 @@ export default function SignupPage() {
         <div className="h-px flex-1 bg-slate-200" />
       </div>
 
-      <AuthForm action={signUp} submitLabel="Sign up" />
+      <AuthForm
+        action={signUp}
+        submitLabel="Sign up"
+        identifierName="username"
+        identifierLabel="Username"
+      />
 
       <p className="mt-6 text-center text-sm text-slate-500">
         Already have an account?{" "}

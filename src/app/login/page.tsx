@@ -23,7 +23,12 @@ export default function LoginPage() {
         <div className="h-px flex-1 bg-slate-200" />
       </div>
 
-      <AuthForm action={signIn} submitLabel="Log in" />
+      <AuthForm
+        action={signIn}
+        submitLabel="Log in"
+        identifierName="identifier"
+        identifierLabel="Username or email"
+      />
 
       <p className="mt-6 text-center text-sm text-slate-500">
         No account yet?{" "}

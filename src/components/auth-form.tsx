@@ -6,12 +6,18 @@ import type { AuthActionState } from "@/app/auth/actions";
 export function AuthForm({
   action,
   submitLabel,
+  identifierName,
+  identifierLabel,
+  identifierType = "text",
 }: {
   action: (
     state: AuthActionState,
     formData: FormData,
   ) => Promise<AuthActionState>;
   submitLabel: string;
+  identifierName: string;
+  identifierLabel: string;
+  identifierType?: string;
 }) {
   const [state, formAction, pending] = useActionState<AuthActionState, FormData>(
     action,
@@ -21,13 +27,13 @@ export function AuthForm({
   return (
     <form action={formAction} className="space-y-4">
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-slate-700">
-          Email
+        <label htmlFor={identifierName} className="block text-sm font-medium text-slate-700">
+          {identifierLabel}
         </label>
         <input
-          id="email"
-          name="email"
-          type="email"
+          id={identifierName}
+          name={identifierName}
+          type={identifierType}
           required
           className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
         />
