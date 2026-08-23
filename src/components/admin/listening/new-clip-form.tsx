@@ -21,6 +21,7 @@ export function NewClipForm() {
     const formData = new FormData(form);
     const title = (formData.get("title") as string)?.trim();
     const transcript = (formData.get("transcript") as string) ?? "";
+    const exam = (formData.get("exam") as string) ?? "";
     const fileInput = form.elements.namedItem("audio") as HTMLInputElement;
     const file = fileInput.files?.[0];
 
@@ -47,6 +48,7 @@ export function NewClipForm() {
         fd.set("title", title);
         fd.set("audio_path", path);
         fd.set("transcript", transcript);
+        fd.set("exam", exam);
         await createClip(fd);
 
         form.reset();
@@ -80,6 +82,15 @@ export function NewClipForm() {
         rows={4}
         className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
       />
+      <select
+        name="exam"
+        defaultValue=""
+        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+      >
+        <option value="">General English</option>
+        <option value="ielts">IELTS</option>
+        <option value="cefr">CEFR</option>
+      </select>
       <button
         type="submit"
         disabled={isPending}

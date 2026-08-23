@@ -2,10 +2,11 @@ import { GraduationCap, Award, BadgeCheck, type LucideIcon } from "lucide-react"
 
 /**
  * The three top-level entry points on the homepage. "General English"
- * groups the five modules that aren't exam-specific; IELTS and CEFR each
- * link straight into that exam's Speaking practice (src/lib/speaking/exams.ts)
- * since that's the only exam-specific content today — a natural place to
- * add more IELTS/CEFR-specific modules later without touching Speaking.
+ * groups the five modules that aren't exam-specific. IELTS and CEFR each
+ * link to an exam hub (src/app/[exam]/page.tsx) with three windows —
+ * Listening, Reading, Speaking — all scoped to that exam: Listening/Reading
+ * via the nullable `exam` column on listening_clips/reading_passages, and
+ * Speaking via its existing exam/part taxonomy (src/lib/speaking/exams.ts).
  */
 export type Track = {
   slug: "general" | "ielts" | "cefr";
@@ -28,16 +29,16 @@ export const TRACKS: Track[] = [
   {
     slug: "ielts",
     name: "IELTS",
-    tagline: "Speaking practice for the IELTS exam",
-    href: "/speaking/ielts",
+    tagline: "Listening, reading, and speaking for the IELTS exam",
+    href: "/ielts",
     icon: Award,
     gradient: "from-rose-400 to-red-600",
   },
   {
     slug: "cefr",
     name: "CEFR",
-    tagline: "Speaking practice for the CEFR exam",
-    href: "/speaking/cefr",
+    tagline: "Listening, reading, and speaking for the CEFR exam",
+    href: "/cefr",
     icon: BadgeCheck,
     gradient: "from-emerald-400 to-teal-600",
   },

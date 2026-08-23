@@ -1,13 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import type { ReadingPassage, ReadingWord, ReadingGameMode } from "@/lib/reading/types";
 import type { LeaderboardRow } from "@/lib/leaderboard";
+import type { Exam } from "@/lib/exam";
 
-export async function listPassages(): Promise<(ReadingPassage & { wordCount: number })[]> {
+export async function listPassages({
+  exam = null,
+}: { exam?: Exam | null } = {}): Promise<(ReadingPassage & { wordCount: number })[]> {
   const supabase = await createClient();
-  const { data: passages, error } = await supabase
-    .from("reading_passages")
-    .select("*")
-    .order("created_at", { ascending: false });
+  let query = supabase.from("reading_passages").select("*");
+  query = exam === null ? query.is("exam", null) : query.eq("exam", exam);
+  const { data: passages, error } = await query.order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
 
   const { data: words } = await supabase.from("reading_words").select("passage_id");

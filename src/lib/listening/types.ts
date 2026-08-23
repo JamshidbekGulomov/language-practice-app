@@ -1,9 +1,12 @@
+import type { Exam } from "@/lib/exam";
+
 export type ListeningClip = {
   id: string;
   title: string;
   slug: string;
   audio_path: string;
   transcript: string | null;
+  exam: Exam | null;
   created_at: string;
 };
 

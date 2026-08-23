@@ -6,10 +6,13 @@ import { requireAdmin } from "@/lib/supabase/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/slugify";
 import type { ReadingPassage, ReadingWord } from "@/lib/reading/types";
+import { isExam } from "@/lib/exam";
 
 export async function createPassage(formData: FormData) {
   const title = (formData.get("title") as string)?.trim();
   const body = (formData.get("body") as string)?.trim();
+  const examRaw = (formData.get("exam") as string) || "";
+  const exam = isExam(examRaw) ? examRaw : null;
 
   if (!title) throw new Error("Title is required");
   if (!body) throw new Error("Passage text is required");
@@ -31,7 +34,7 @@ export async function createPassage(formData: FormData) {
     slug = `${baseSlug}-${attempt}`;
   }
 
-  await adminInsert<ReadingPassage>("reading_passages", { title, slug, body });
+  await adminInsert<ReadingPassage>("reading_passages", { title, slug, body, exam });
   revalidatePath("/admin/reading");
   revalidatePath("/reading");
 }

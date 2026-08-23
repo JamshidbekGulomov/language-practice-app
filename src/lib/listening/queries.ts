@@ -5,13 +5,15 @@ import type {
   ListeningGameMode,
 } from "@/lib/listening/types";
 import type { LeaderboardRow } from "@/lib/leaderboard";
+import type { Exam } from "@/lib/exam";
 
-export async function listClips(): Promise<(ListeningClip & { wordCount: number })[]> {
+export async function listClips({
+  exam = null,
+}: { exam?: Exam | null } = {}): Promise<(ListeningClip & { wordCount: number })[]> {
   const supabase = await createClient();
-  const { data: clips, error } = await supabase
-    .from("listening_clips")
-    .select("*")
-    .order("created_at", { ascending: false });
+  let query = supabase.from("listening_clips").select("*");
+  query = exam === null ? query.is("exam", null) : query.eq("exam", exam);
+  const { data: clips, error } = await query.order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
 
   const { data: words } = await supabase.from("listening_words").select("clip_id");

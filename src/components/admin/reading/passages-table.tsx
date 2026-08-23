@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { DataTable } from "@/components/admin/data-table";
 import type { ReadingPassage } from "@/lib/reading/types";
+import { EXAM_LABELS } from "@/lib/exam";
 
 type Row = ReadingPassage & { wordCount: number };
 
@@ -29,6 +30,11 @@ export function PassagesTable({
           ),
         },
         { key: "wordCount", label: "Words" },
+        {
+          key: "exam",
+          label: "Exam",
+          render: (row) => (row.exam ? EXAM_LABELS[row.exam] : "General"),
+        },
       ]}
       rows={rows}
       onDelete={onDelete}

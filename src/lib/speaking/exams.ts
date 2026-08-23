@@ -1,4 +1,7 @@
-export type SpeakingExam = "cefr" | "ielts";
+import type { Exam } from "@/lib/exam";
+import { isExam } from "@/lib/exam";
+
+export type SpeakingExam = Exam;
 export type SpeakingFormat = "qa" | "cue_card" | "images";
 
 export type SpeakingPartDef = {
@@ -91,7 +94,7 @@ export const SPEAKING_EXAMS: Record<SpeakingExam, { label: string; parts: Speaki
 };
 
 export function isSpeakingExam(value: string): value is SpeakingExam {
-  return value === "cefr" || value === "ielts";
+  return isExam(value);
 }
 
 export function getPartDef(exam: SpeakingExam, part: string): SpeakingPartDef | undefined {

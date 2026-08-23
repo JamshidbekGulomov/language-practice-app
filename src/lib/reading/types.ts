@@ -1,8 +1,11 @@
+import type { Exam } from "@/lib/exam";
+
 export type ReadingPassage = {
   id: string;
   title: string;
   slug: string;
   body: string;
+  exam: Exam | null;
   created_at: string;
 };
 

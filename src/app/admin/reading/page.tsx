@@ -36,6 +36,15 @@ export default async function AdminReadingPage() {
           rows={6}
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />
+        <select
+          name="exam"
+          defaultValue=""
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        >
+          <option value="">General English</option>
+          <option value="ielts">IELTS</option>
+          <option value="cefr">CEFR</option>
+        </select>
         <button
           type="submit"
           className="rounded-lg bg-gradient-to-r from-indigo-600 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white transition hover:from-indigo-500 hover:to-fuchsia-500"

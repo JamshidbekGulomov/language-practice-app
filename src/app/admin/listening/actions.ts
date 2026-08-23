@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/slugify";
 import { LISTENING_AUDIO_BUCKET } from "@/lib/listening/storage";
 import type { ListeningClip, ListeningWord } from "@/lib/listening/types";
+import { isExam } from "@/lib/exam";
 
 /**
  * Vercel Serverless Functions cap request bodies at 4.5MB, so audio files
@@ -32,6 +33,8 @@ export async function createClip(formData: FormData) {
   const title = (formData.get("title") as string)?.trim();
   const audioPath = (formData.get("audio_path") as string)?.trim();
   const transcript = ((formData.get("transcript") as string) || "").trim() || null;
+  const examRaw = (formData.get("exam") as string) || "";
+  const exam = isExam(examRaw) ? examRaw : null;
 
   if (!title) throw new Error("Title is required");
   if (!audioPath) throw new Error("Audio upload is required");
@@ -58,6 +61,7 @@ export async function createClip(formData: FormData) {
     slug,
     audio_path: audioPath,
     transcript,
+    exam,
   });
   revalidatePath("/admin/listening");
   revalidatePath("/listening");
