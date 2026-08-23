@@ -10,13 +10,14 @@ type ReviewRow = {
   created_at: string;
   profiles: { email: string; display_name: string | null } | null;
   speaking_topics: { title: string } | null;
+  speaking_questions: { question: string } | null;
 };
 
 export default async function AdminSpeakingReviewPage() {
   const rows = await adminList<ReviewRow>("speaking_submissions", {
     eq: { sent_to_teacher: true },
     select:
-      "id, audio_path, teacher_feedback, created_at, profiles(email, display_name), speaking_topics(title)",
+      "id, audio_path, teacher_feedback, created_at, profiles(email, display_name), speaking_topics(title), speaking_questions(question)",
     orderBy: "created_at",
     ascending: false,
   });
@@ -46,6 +47,12 @@ export default async function AdminSpeakingReviewPage() {
                 </span>
                 <span>{new Date(r.created_at).toLocaleDateString()}</span>
               </div>
+
+              {r.speaking_questions?.question && (
+                <p className="mt-2 text-sm font-medium text-slate-700">
+                  {r.speaking_questions.question}
+                </p>
+              )}
 
               {r.audio_url ? (
                 <audio controls src={r.audio_url} className="mt-2 w-full" />

@@ -93,38 +93,53 @@ export default async function AdminSpeakingTopicPage({
         </div>
       )}
 
-      <div className="mt-10">
-        <h2 className="text-lg font-bold text-slate-900">
-          {topic.format === "qa" ? "Questions" : "Guided questions"}
-        </h2>
-        {topic.format !== "qa" && (
-          <p className="mt-1 text-sm text-slate-500">
-            Optional follow-up questions shown alongside the prompt.
-          </p>
-        )}
+      {partDef?.questionCount !== 0 && (
+        <div className="mt-10">
+          <h2 className="text-lg font-bold text-slate-900">
+            {topic.format === "cue_card" ? "Guided questions" : "Questions"}
+          </h2>
+          {topic.format === "cue_card" && (
+            <p className="mt-1 text-sm text-slate-500">
+              Optional follow-up questions shown alongside the prompt.
+            </p>
+          )}
+          {typeof partDef?.questionCount === "number" && partDef.questionCount > 0 && (
+            <p className="mt-1 text-sm text-slate-500">
+              {questions.length} of {partDef.questionCount} required.
+            </p>
+          )}
+          {topic.format === "qa" && (
+            <p className="mt-1 text-sm text-slate-500">
+              Each question gets its own recording, self-check, and send-to-teacher.
+            </p>
+          )}
 
-        <form
-          action={addQuestion.bind(null, id)}
-          className="mt-3 flex gap-3 rounded-lg border border-slate-200 p-4"
-        >
-          <input
-            name="question"
-            placeholder="e.g. Why was it memorable?"
-            required
-            className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-          />
-          <button
-            type="submit"
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
-          >
-            Add
-          </button>
-        </form>
+          {(typeof partDef?.questionCount !== "number" ||
+            questions.length < partDef.questionCount) && (
+            <form
+              action={addQuestion.bind(null, id)}
+              className="mt-3 flex gap-3 rounded-lg border border-slate-200 p-4"
+            >
+              <input
+                name="question"
+                placeholder="e.g. Why was it memorable?"
+                required
+                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+              <button
+                type="submit"
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+              >
+                Add
+              </button>
+            </form>
+          )}
 
-        <div className="mt-4">
-          <QuestionsTable rows={questions} onDelete={deleteQuestion.bind(null, id)} />
+          <div className="mt-4">
+            <QuestionsTable rows={questions} onDelete={deleteQuestion.bind(null, id)} />
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mt-10">
         <h2 className="text-lg font-bold text-slate-900">Vocab hints</h2>

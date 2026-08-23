@@ -74,7 +74,7 @@ export async function getSpeakingAudioUrl(path: string): Promise<string | null> 
   return data.signedUrl;
 }
 
-/** Most recent submission for the current user on this topic, with a fresh signed playback URL attached. */
+/** Most recent whole-topic submission (cue-card / images formats — question_id is null) for the current user, with a fresh signed playback URL attached. */
 export async function getMySubmission(
   topicId: string,
 ): Promise<(SpeakingSubmission & { audio_url: string | null }) | null> {
@@ -89,6 +89,7 @@ export async function getMySubmission(
     .select("*")
     .eq("topic_id", topicId)
     .eq("user_id", user.id)
+    .is("question_id", null)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -96,4 +97,30 @@ export async function getMySubmission(
 
   const audio_url = await getSpeakingAudioUrl(data.audio_path);
   return { ...data, audio_url };
+}
+
+/** Latest per-question submission for the current user on this topic (qa format), keyed by question_id, each with a fresh signed playback URL. */
+export async function getMyQuestionSubmissions(
+  topicId: string,
+): Promise<Map<string, SpeakingSubmission & { audio_url: string | null }>> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return new Map();
+
+  const { data } = await supabase
+    .from("speaking_submissions")
+    .select("*")
+    .eq("topic_id", topicId)
+    .eq("user_id", user.id)
+    .not("question_id", "is", null)
+    .order("created_at", { ascending: true });
+
+  const map = new Map<string, SpeakingSubmission & { audio_url: string | null }>();
+  for (const row of data ?? []) {
+    const audio_url = await getSpeakingAudioUrl(row.audio_path);
+    map.set(row.question_id as string, { ...row, audio_url });
+  }
+  return map;
 }

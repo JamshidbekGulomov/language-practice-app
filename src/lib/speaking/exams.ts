@@ -6,14 +6,29 @@ export type SpeakingPartDef = {
   label: string;
   description: string;
   format: SpeakingFormat;
+  /** Exact image count for "images" parts. */
   imageCount?: number;
+  /**
+   * Question-count rule: undefined = open-ended list (qa parts, and the
+   * optional bullet points under a cue card); 0 = questions aren't used at
+   * all for this part; a positive number = exactly that many required
+   * (e.g. the 3 questions tied to CEFR 1.1's two images).
+   */
+  questionCount?: number;
+  /** Cue-card-only: seconds of silent prep before recording starts automatically. */
+  prepSeconds?: number;
+  /** Cue-card-only: recording auto-stops after this many seconds. */
+  maxSeconds?: number;
 };
 
 /**
  * The full exam/part taxonomy. This is the single source of truth for
- * what parts exist per exam and what format each renders as — admin
- * create/edit forms and the DB check constraint on speaking_topics both
- * derive from this shape, so keep them in sync if it changes.
+ * what parts exist per exam, what format each renders as, and how the
+ * practice mechanic works (turn-by-turn Q&A vs. a single timed cue-card
+ * take vs. a single untimed take against images) — admin create/edit
+ * forms, the public practice UI, and the DB check constraint on
+ * speaking_topics all derive from this shape, so keep them in sync if
+ * it changes.
  */
 export const SPEAKING_EXAMS: Record<SpeakingExam, { label: string; parts: SpeakingPartDef[] }> = {
   cefr: {
@@ -26,14 +41,23 @@ export const SPEAKING_EXAMS: Record<SpeakingExam, { label: string; parts: Speaki
         description: "Two images — questions",
         format: "images",
         imageCount: 2,
+        questionCount: 3,
       },
-      { key: "part2", label: "Part 2", description: "Cue card", format: "cue_card" },
+      {
+        key: "part2",
+        label: "Part 2",
+        description: "Cue card",
+        format: "cue_card",
+        prepSeconds: 60,
+        maxSeconds: 120,
+      },
       {
         key: "part3",
         label: "Part 3",
         description: "Image — describe",
         format: "images",
         imageCount: 1,
+        questionCount: 0,
       },
     ],
   },
@@ -41,7 +65,14 @@ export const SPEAKING_EXAMS: Record<SpeakingExam, { label: string; parts: Speaki
     label: "IELTS",
     parts: [
       { key: "part1", label: "Part 1", description: "Question & answer", format: "qa" },
-      { key: "part2", label: "Part 2", description: "Cue card", format: "cue_card" },
+      {
+        key: "part2",
+        label: "Part 2",
+        description: "Cue card",
+        format: "cue_card",
+        prepSeconds: 60,
+        maxSeconds: 120,
+      },
       { key: "part3", label: "Part 3", description: "Question & answer", format: "qa" },
     ],
   },

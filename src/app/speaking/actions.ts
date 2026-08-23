@@ -31,7 +31,12 @@ export async function createUploadUrl(extension: string) {
   return { path, token: data.token };
 }
 
-export async function submitRecording(topicId: string, topicPath: string, audioPath: string) {
+export async function submitRecording(
+  topicId: string,
+  topicPath: string,
+  audioPath: string,
+  questionId?: string,
+) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -41,6 +46,7 @@ export async function submitRecording(topicId: string, topicPath: string, audioP
   const { error } = await supabase.from("speaking_submissions").insert({
     user_id: user.id,
     topic_id: topicId,
+    question_id: questionId ?? null,
     audio_path: audioPath,
   });
   if (error) throw new Error(error.message);

@@ -86,6 +86,30 @@ export async function addQuestion(topicId: string, formData: FormData) {
   const question = (formData.get("question") as string)?.trim();
   if (!question) throw new Error("Question is required");
 
+  await requireAdmin();
+  const admin = createAdminClient();
+
+  const { data: topic } = await admin
+    .from("speaking_topics")
+    .select("exam, part")
+    .eq("id", topicId)
+    .maybeSingle();
+  if (!topic) throw new Error("Topic not found");
+
+  const partDef = isSpeakingExam(topic.exam) ? getPartDef(topic.exam, topic.part) : undefined;
+  if (partDef?.questionCount === 0) {
+    throw new Error("This part doesn't use questions");
+  }
+  if (typeof partDef?.questionCount === "number" && partDef.questionCount > 0) {
+    const { count } = await admin
+      .from("speaking_questions")
+      .select("id", { count: "exact", head: true })
+      .eq("topic_id", topicId);
+    if ((count ?? 0) >= partDef.questionCount) {
+      throw new Error(`This part allows exactly ${partDef.questionCount} questions`);
+    }
+  }
+
   await adminInsert<SpeakingQuestion>("speaking_questions", { topic_id: topicId, question });
   revalidatePath(`/admin/speaking/${topicId}`);
 }

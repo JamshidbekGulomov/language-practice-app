@@ -7,12 +7,14 @@ import {
   getHints,
   getImages,
   getMySubmission,
+  getMyQuestionSubmissions,
 } from "@/lib/speaking/queries";
 import { getCurrentProfile } from "@/lib/supabase/get-profile";
 import { getSpeakingImageUrl } from "@/lib/speaking/storage";
 import { getPartDef, isSpeakingExam } from "@/lib/speaking/exams";
 import { AudioRecorder } from "@/components/speaking/audio-recorder";
 import { SubmissionPanel } from "@/components/speaking/submission-panel";
+import { QaPractice } from "@/components/speaking/qa-practice";
 import { markSelfChecked, sendToTeacher } from "@/app/speaking/actions";
 
 export default async function SpeakingTopicPage({
@@ -28,17 +30,24 @@ export default async function SpeakingTopicPage({
 
   const partDef = getPartDef(topic.exam, topic.part);
   const topicPath = `/speaking/${exam}/${slug}`;
+  const isQa = topic.format === "qa";
 
-  const [profile, questions, hints, images, submission] = await Promise.all([
+  const [profile, questions, hints, images, submission, questionSubmissions] = await Promise.all([
     getCurrentProfile(),
     getQuestions(topic.id),
     getHints(topic.id),
     topic.format === "images" ? getImages(topic.id) : Promise.resolve([]),
-    getMySubmission(topic.id),
+    isQa ? Promise.resolve(null) : getMySubmission(topic.id),
+    isQa ? getMyQuestionSubmissions(topic.id) : Promise.resolve(new Map()),
   ]);
 
   const boundMarkSelfChecked = markSelfChecked.bind(null, topicPath);
   const boundSendToTeacher = sendToTeacher.bind(null, topicPath);
+
+  // For qa format, each question gets its own recorder inline below — the
+  // plain list is only useful before login (or for other formats, where
+  // it's optional guidance alongside a single take).
+  const showQuestionList = questions.length > 0 && !(profile && isQa);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
@@ -65,10 +74,10 @@ export default async function SpeakingTopicPage({
         </div>
       )}
 
-      {questions.length > 0 && (
+      {showQuestionList && (
         <div className="mt-6">
           <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">
-            {topic.format === "qa" ? "Questions" : "Guided questions"}
+            {isQa ? "Questions" : "Guided questions"}
           </h2>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
             {questions.map((q) => (
@@ -110,14 +119,28 @@ export default async function SpeakingTopicPage({
         <div className="mt-10">
           <h2 className="text-lg font-bold text-slate-900">Record your answer</h2>
           <div className="mt-4">
-            {submission ? (
+            {isQa ? (
+              <QaPractice
+                topicId={topic.id}
+                topicPath={topicPath}
+                questions={questions}
+                submissions={Object.fromEntries(questionSubmissions)}
+                onMarkSelfChecked={boundMarkSelfChecked}
+                onSendToTeacher={boundSendToTeacher}
+              />
+            ) : submission ? (
               <SubmissionPanel
                 submission={submission}
                 onMarkSelfChecked={boundMarkSelfChecked}
                 onSendToTeacher={boundSendToTeacher}
               />
             ) : (
-              <AudioRecorder topicId={topic.id} topicPath={topicPath} />
+              <AudioRecorder
+                topicId={topic.id}
+                topicPath={topicPath}
+                prepSeconds={partDef?.prepSeconds}
+                maxSeconds={partDef?.maxSeconds}
+              />
             )}
           </div>
         </div>

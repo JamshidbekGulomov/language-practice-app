@@ -1,12 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { createUploadUrl, submitRecording } from "@/app/speaking/actions";
 import { SPEAKING_AUDIO_BUCKET } from "@/lib/speaking/storage";
 
-type Status = "idle" | "recording" | "recorded" | "uploading";
+type Status = "idle" | "prep" | "recording" | "recorded" | "uploading";
 
 function pickExtension(mimeType: string): string {
   if (mimeType.includes("mp4")) return "m4a";
@@ -14,18 +14,47 @@ function pickExtension(mimeType: string): string {
   return "webm";
 }
 
-export function AudioRecorder({ topicId, topicPath }: { topicId: string; topicPath: string }) {
+/**
+ * Handles all three Speaking practice mechanics via optional timer props:
+ * plain record-once (images format, per-question qa turns — no props),
+ * or a cue-card take with silent prep then an auto-stopping timed
+ * recording (prepSeconds + maxSeconds).
+ */
+export function AudioRecorder({
+  topicId,
+  topicPath,
+  questionId,
+  prepSeconds,
+  maxSeconds,
+}: {
+  topicId: string;
+  topicPath: string;
+  questionId?: string;
+  prepSeconds?: number;
+  maxSeconds?: number;
+}) {
   const router = useRouter();
   const supabase = createClient();
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const blobRef = useRef<Blob | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  async function startRecording() {
+  function clearTimer() {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }
+
+  useEffect(() => clearTimer, []);
+
+  async function beginRecording() {
     setError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -40,14 +69,50 @@ export function AudioRecorder({ topicId, topicPath }: { topicId: string; topicPa
         blobRef.current = blob;
         setPreviewUrl(URL.createObjectURL(blob));
         setStatus("recorded");
+        clearTimer();
+        setSecondsLeft(null);
         stream.getTracks().forEach((t) => t.stop());
       };
 
       recorder.start();
       recorderRef.current = recorder;
       setStatus("recording");
+
+      if (maxSeconds) {
+        setSecondsLeft(maxSeconds);
+        timerRef.current = setInterval(() => {
+          setSecondsLeft((s) => {
+            if (s !== null && s <= 1) {
+              clearTimer();
+              recorderRef.current?.stop();
+              return 0;
+            }
+            return s === null ? null : s - 1;
+          });
+        }, 1000);
+      }
     } catch {
       setError("Couldn't access your microphone. Check your browser permissions.");
+      setStatus("idle");
+    }
+  }
+
+  function start() {
+    if (prepSeconds) {
+      setStatus("prep");
+      setSecondsLeft(prepSeconds);
+      timerRef.current = setInterval(() => {
+        setSecondsLeft((s) => {
+          if (s !== null && s <= 1) {
+            clearTimer();
+            beginRecording();
+            return 0;
+          }
+          return s === null ? null : s - 1;
+        });
+      }, 1000);
+    } else {
+      beginRecording();
     }
   }
 
@@ -74,7 +139,7 @@ export function AudioRecorder({ topicId, topicPath }: { topicId: string; topicPa
         .uploadToSignedUrl(path, token, blob);
       if (uploadError) throw new Error(uploadError.message);
 
-      await submitRecording(topicId, topicPath, path);
+      await submitRecording(topicId, topicPath, path, questionId);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -86,20 +151,32 @@ export function AudioRecorder({ topicId, topicPath }: { topicId: string; topicPa
     <div className="rounded-lg border border-slate-200 p-4">
       {status === "idle" && (
         <button
-          onClick={startRecording}
+          onClick={start}
           className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
         >
-          Start recording
+          {prepSeconds ? `Start (${prepSeconds}s to prepare)` : "Start recording"}
         </button>
       )}
 
+      {status === "prep" && (
+        <div className="text-center">
+          <p className="text-sm font-medium text-slate-600">Prepare your answer…</p>
+          <p className="mt-2 text-3xl font-bold text-slate-900">{secondsLeft}s</p>
+        </div>
+      )}
+
       {status === "recording" && (
-        <button
-          onClick={stopRecording}
-          className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500"
-        >
-          Stop recording
-        </button>
+        <div className="space-y-3 text-center">
+          {secondsLeft !== null && (
+            <p className="text-sm font-medium text-slate-600">{secondsLeft}s remaining</p>
+          )}
+          <button
+            onClick={stopRecording}
+            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500"
+          >
+            Stop recording
+          </button>
+        </div>
       )}
 
       {(status === "recorded" || status === "uploading") && previewUrl && (
