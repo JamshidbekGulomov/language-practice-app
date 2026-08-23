@@ -25,6 +25,9 @@ export async function suggestWord(
   await requireAdmin();
   try {
     const suggestion = await suggestVocabWord(trimmed);
+    if (!suggestion.uzbek) {
+      return { ok: false, error: "AI didn't return a usable suggestion — try again." };
+    }
     return { ok: true, suggestion };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Couldn't get an AI suggestion" };
