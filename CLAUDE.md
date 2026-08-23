@@ -1,1 +1,69 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 @AGENTS.md
+
+## Project
+
+A language-practice platform (listening, reading, vocabulary, writing, speaking, translation) built with Next.js App Router, Supabase (Postgres + Auth + Storage), and deployed on Vercel. Content is managed entirely through an admin dashboard (`/admin`) — there is no seed data or CMS outside the app itself.
+
+Live Supabase project ref: `uxtjjkmxkhhtnozuokpw`. Deployed from the `claude/language-platform-phase-0-wipphb` branch to the Vercel project `language-practice-app` (auto-deploys on push).
+
+## Commands
+
+```bash
+npm run dev      # dev server
+npm run build    # production build — run this + npx tsc --noEmit before considering any change done
+npm run lint     # eslint (flat config, eslint-config-next)
+npx tsc --noEmit # typecheck only, faster than a full build
+```
+
+There is no test suite. Verification is: typecheck → `npm run build` → `npm run lint`, all clean, before pushing.
+
+## Environment variables
+
+| Variable | Used by | Secret? |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | browser + server | No |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser + server | No |
+| `SUPABASE_SERVICE_ROLE_KEY` | server only, bypasses RLS | **Yes** |
+
+Local dev: `cp .env.local.example .env.local` and fill in values (gitignored). Production values live in Vercel's project env settings.
+
+## Auth & roles
+
+Every signup fires a Postgres trigger that inserts a `public.profiles` row; the trigger grants `role = 'admin'` if the email is in `public.admin_emails`, else `'student'`. `getCurrentProfile()` (`src/lib/supabase/get-profile.ts`) reads the current user + profile. `requireAdmin()` (`src/lib/supabase/require-admin.ts`) re-checks the role and redirects if it fails — call this at the top of every admin page/layout **and every admin Server Action**, since route-level gating alone doesn't protect an action that's reachable directly.
+
+Three Supabase client variants (`src/lib/supabase/`):
+- `client.ts` — browser client (Client Components).
+- `server.ts` — request-scoped server client using cookies; respects RLS as the signed-in user. Used for all public reads and student writes (scores, submissions).
+- `admin.ts` — `createAdminClient()`, service-role key, bypasses RLS entirely. Used only inside admin Server Actions, always after `requireAdmin()`.
+
+Public content tables (categories/words/clips/passages/lessons) have `select` RLS policies open to `anon, authenticated`; there are deliberately no write policies for them — all admin writes go through the service-role client instead, gated by `requireAdmin()` in code rather than RLS.
+
+## The module pattern
+
+Vocabulary, Listening, and Reading are structurally identical and share code — this is the shape any new module (Speaking, Translation) or any change to game mechanics should follow:
+
+- **DB**: a content table (`vocab_categories` / `listening_clips` / `reading_passages`), a `*_words` table with `word` + `meaning`, and a `*_scores` table (`user_id`, content FK, `game_mode`, `score`, `total`) with public `select` (leaderboard) and student-own `insert`.
+- **Admin**: `/admin/<module>` list+create, `/admin/<module>/[id]` detail page managing that item's words (single-add form + CSV/XLSX bulk upload parsed client-side via `xlsx`).
+- **Public**: `/<module>` list, `/<module>/[slug]` detail with a game-mode picker + leaderboards, `/<module>/[slug]/<mode>` game pages. Games require login (`getCurrentProfile()` → `redirect("/login")` if absent); browsing does not.
+- **Shared building blocks** (`src/components/`, `src/lib/`) used across all three: `MatchingGame`, `MultipleChoiceGame`, `FillBlankGame`, `Leaderboard`, plus `build-mc-questions.ts`, `fill-blank.ts`, `sample.ts` (`MATCHING_ROUND_SIZE`), `slugify.ts`, `leaderboard.ts` (the `LeaderboardRow` type). If a game mechanic needs to change, it usually belongs here, not in one module — a fix in `MatchingGame` affects Vocabulary, Listening, and Reading at once.
+
+**Writing is intentionally different**: it's a linear flow (watch video → gap-fill unlocks sentence-construction) with no public leaderboard — `writing_gap_fill_results` and `writing_sentence_submissions` are private to the student and the admin (via a review queue at `/admin/writing/review`, service-role client, no student update policy). Sentence-submission mutations (self-check, send-to-teacher) go through Server Actions that manually re-verify `auth.uid()` ownership before writing with the service-role client, rather than relying on an RLS update policy.
+
+Speaking and Translation are still placeholders (`src/components/admin/admin-module-placeholder.tsx` on the admin side, `src/components/module-landing.tsx` on the public side).
+
+## Generic CRUD scaffolding
+
+`src/lib/admin/crud.ts` (`adminList`, `adminInsert`, `adminInsertMany`, `adminUpdate`, `adminDelete`) wraps the service-role client with a `requireAdmin()` check on every call — every module's admin actions call these instead of touching Supabase directly. `adminList`'s `eq` filter accepts string/number/boolean.
+
+`DataTable` (`src/components/admin/data-table.tsx`) is the generic list-with-delete component. **Do not define its `columns[].render` functions inline in a Server Component page and pass them down** — Next.js RSC only allows plain data or actual Server Actions across the server→client boundary, not arbitrary closures, and this fails at runtime (not at build time) with "Functions cannot be passed directly to Client Components." Instead, wrap `DataTable` in a small `"use client"` component per module (e.g. `src/components/admin/vocab/vocab-categories-table.tsx`) that defines its own `columns` locally and takes only plain data + bound Server Actions as props.
+
+## Supabase-specific gotchas hit in this repo
+
+- **PostgREST schema cache**: after a migration that adds a foreign key to an *existing* table (not at `create table` time), embedded selects like `.select("*, profiles(email)")` can fail until the cache refreshes. Run `notify pgrst, 'reload schema';` via `execute_sql` after such a migration.
+- **`xlsx` package**: the npm-published version has known prototype-pollution/ReDoS CVEs with no fix available. It is only ever imported in `"use client"` upload-form components (parsing happens in the admin's browser); never import it in server code. Only clean, validated row objects get sent to Server Actions.
+- **Large file uploads (audio)**: Vercel Serverless Functions cap request bodies at 4.5MB, so Server Actions can't carry an audio file directly. The Listening module's upload flow (`src/app/admin/listening/actions.ts` `createUploadUrl` + `src/components/admin/listening/new-clip-form.tsx`) instead has the browser upload straight to Supabase Storage via a signed upload URL; only the resulting storage path touches the server.
+- **Video embeds** (Writing module): `src/lib/writing/video-embed.ts` auto-detects YouTube vs. Telegram-channel-post links from a single "video link" field. Telegram embeds use their official `telegram-widget.js` script (`src/components/writing/telegram-embed.tsx`), not a raw iframe — a bare `t.me/...?embed=1` iframe doesn't size itself correctly.
