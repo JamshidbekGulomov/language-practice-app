@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { extractPdfText } from "@/lib/reading-exam/pdf-text";
 import {
   updatePassage,
   addWord,
@@ -62,6 +63,11 @@ export function PassageEditor({
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiApplied, setAiApplied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [textPending, setTextPending] = useState(false);
+  const [textError, setTextError] = useState<string | null>(null);
+  const [textApplied, setTextApplied] = useState(false);
+  const textFileInputRef = useRef<HTMLInputElement>(null);
 
   const [wordSuggestions, setWordSuggestions] = useState<{ word: string; meaning: string; checked: boolean }[]>([]);
   const [suggestingWords, setSuggestingWords] = useState(false);
@@ -271,12 +277,59 @@ export function PassageEditor({
     });
   }
 
+  async function handleLoadTextFromPdf() {
+    const file = textFileInputRef.current?.files?.[0];
+    if (!file) {
+      setTextError("Choose a PDF first");
+      return;
+    }
+    setTextError(null);
+    setTextApplied(false);
+    setTextPending(true);
+    try {
+      const extracted = await extractPdfText(file);
+      if (extracted.length === 0) {
+        setTextError("Couldn't find any text in that PDF (it may be a scanned image).");
+        return;
+      }
+      setParagraphs(extracted);
+      setTextApplied(true);
+      if (textFileInputRef.current) textFileInputRef.current.value = "";
+    } catch (err) {
+      setTextError(err instanceof Error ? err.message : "Couldn't read that PDF");
+    } finally {
+      setTextPending(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <Section title="🤖 Analyze a PDF with AI">
+      <Section title="📄 Load text from a PDF (no AI)">
+        <p className="mb-3 text-xs text-slate-500">
+          Pulls the raw text out of the PDF, entirely in your browser — no AI, no server call, instant. It guesses
+          paragraph breaks (from lettered markers like &ldquo;A&rdquo;, or blank lines) so you don&apos;t have to
+          retype the passage, but you still split/merge/edit the paragraphs below and fill in the glossary and
+          questions yourself.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <input ref={textFileInputRef} type="file" accept="application/pdf" className="text-sm" />
+          <button
+            onClick={handleLoadTextFromPdf}
+            disabled={textPending}
+            className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50"
+          >
+            {textPending ? "Reading PDF…" : "Load text"}
+          </button>
+          {textApplied && <span className="text-sm font-medium text-emerald-600">Paragraphs filled in below ✓</span>}
+        </div>
+        {textError && <p className="mt-2 text-sm text-red-600">{textError}</p>}
+      </Section>
+
+      <Section title="🤖 Analyze a PDF with AI (optional)">
         <p className="mb-3 text-xs text-slate-500">
           Upload the exam PDF (passage + questions) and AI will fill in the passage, glossary, question groups, and
-          its own best-guess answers below — review and correct everything before saving.
+          its own best-guess answers below — review and correct everything before saving. Slower and less
+          predictable than &ldquo;Load text&rdquo; above; use it if you also want a first pass at the questions.
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <input ref={fileInputRef} type="file" accept="application/pdf" className="text-sm" />

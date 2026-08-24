@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Static assets, not source — pdf.worker.min.mjs is a vendored, minified
+    // build artifact copied from pdfjs-dist by the postinstall script.
+    "public/**",
   ]),
 ]);
 
