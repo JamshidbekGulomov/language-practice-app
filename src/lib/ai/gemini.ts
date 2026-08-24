@@ -9,17 +9,31 @@ function apiKey(): string {
 }
 
 async function generateJson(parts: object[], responseSchema: object): Promise<unknown> {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey()}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: { responseMimeType: "application/json", responseSchema },
-      }),
-    },
-  );
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25_000);
+
+  let res: Response;
+  try {
+    res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey()}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: { responseMimeType: "application/json", responseSchema },
+        }),
+        signal: controller.signal,
+      },
+    );
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("Gemini took too long to respond — try again, or with a shorter/simpler PDF");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!res.ok) {
     throw new Error(`Gemini request failed: ${res.status} ${await res.text()}`);
   }
@@ -67,7 +81,7 @@ export async function analyzeSpeakingAudio(
   };
 }
 
-export type ReadingExamAiDraft = {
+export type ReadingExtraction = {
   title: string;
   subtitle: string;
   paragraphs: { letter: string; text: string }[];
@@ -77,14 +91,14 @@ export type ReadingExamAiDraft = {
     label: string;
     startQuestion: number;
     headings: { code: string; label: string }[];
-    items: { paragraphLetter: string; answerCode: string }[];
+    paragraphLetters: string[];
   };
   matching_features: {
     present: boolean;
     label: string;
     startQuestion: number;
     statements: { code: string; text: string }[];
-    items: { personOrFeature: string; answerCode: string }[];
+    personsOrFeatures: string[];
   };
   summary_completion: {
     present: boolean;
@@ -92,42 +106,43 @@ export type ReadingExamAiDraft = {
     startQuestion: number;
     title: string;
     text: string;
-    answers: { question: number; answer: string }[];
   };
   paraphrase_pairs: { keyword: string; phrase: string }[];
 };
 
-/**
- * Reads an uploaded reading-exam PDF (passage + questions) and extracts a
- * full structured draft: paragraphs, glossary, the three supported question
- * types (matching headings / matching features / summary completion), and
- * paraphrase-practice pairs. Since exam PDFs rarely print an answer key,
- * Gemini also answers each question itself from the extracted passage —
- * best-effort, always reviewed by the admin before anything is published.
- */
-export async function analyzeReadingExamPdf(pdfBase64: string): Promise<ReadingExamAiDraft> {
-  const groupProps = {
-    present: { type: "BOOLEAN" },
-    label: { type: "STRING" },
-    startQuestion: { type: "INTEGER" },
-  };
+const GROUP_PROPS = {
+  present: { type: "BOOLEAN" },
+  label: { type: "STRING" },
+  startQuestion: { type: "INTEGER" },
+};
 
+/**
+ * Step 1 of PDF-driven authoring: reads the uploaded PDF (passage +
+ * questions) and pulls out its *structure* only — passage text, glossary,
+ * which of the three question types are present and their raw material
+ * (headings/statements lists, which paragraphs or people need an answer,
+ * the summary text with blanks) — but does not yet answer anything.
+ * Split out from answering so each Gemini call stays small and fast
+ * (Vercel Hobby's serverless functions have a short duration cap, and one
+ * call asking for extraction + reasoning through every question at once
+ * routinely blew past it, killing the request with no usable response).
+ */
+export async function extractReadingPassage(pdfBase64: string): Promise<ReadingExtraction> {
   const result = (await generateJson(
     [
       {
-        text: `You are building a computer-delivered IELTS/CEFR-style reading exam practice page from an uploaded exam PDF.
+        text: `You are building a computer-delivered IELTS/CEFR-style reading exam practice page from an uploaded exam PDF. Extract structure only — do not answer any questions yet.
 
-1. Extract the passage: a title, an optional italic subtitle/intro line, and its paragraphs split by their existing letter labels (A, B, C, ...). If paragraphs aren't lettered in the source, assign letters A, B, C... in order.
+1. The passage: a title, an optional italic subtitle/intro line, and its paragraphs split by their existing letter labels (A, B, C, ...). If paragraphs aren't lettered in the source, assign letters A, B, C... in order.
 2. Pick 6-10 useful or challenging words from the passage for a glossary: a plain-English definition, one or two synonyms, and an Uzbek translation for each.
-3. Identify which of these three question types appear in the questions, and extract each fully (leave "present": false and empty arrays for any type that isn't used):
-   - matching_headings: choosing a heading for each paragraph from a list of heading options (more options than paragraphs). For each item give the paragraph's letter and the correct heading's code.
-   - matching_features: matching a list of people/features to statements about them, from a list of statements (usually more statements than items). For each item give the person/feature name and the correct statement's code (A, B, C...).
-   - summary_completion: a short summary paragraph with numbered blanks. Return its text with each blank replaced by "{{N}}" where N is that question's number, plus the correct answer (usually one or a few words from the passage) for each blank.
-   For matching_headings and matching_features, give "startQuestion" as the first question number in that group; items are ordered so question numbers run startQuestion, startQuestion+1, ... in the order you list them.
-4. The PDF likely has no answer key. Answer every question yourself, carefully, using only the passage text, the way a strong test-taker would.
-5. Also produce 4-8 "paraphrase_pairs": a key word or short phrase taken from one of the questions, paired with the word/phrase in the passage that means the same thing (the paraphrase a student would need to spot). Use exact wording from the passage for "phrase".
+3. Identify which of these three question types appear in the questions (leave "present": false and empty arrays/strings for any type that isn't used):
+   - matching_headings: choosing a heading for each paragraph from a list of heading options (more options than paragraphs). List the heading options, and "paragraphLetters": the letters of the paragraphs that need a heading, in question-number order.
+   - matching_features: matching a list of people/features to statements about them, from a list of statements. List the statements, and "personsOrFeatures": the names/features in question-number order.
+   - summary_completion: a short summary with numbered blanks. Return its text with each blank replaced by "{{N}}" where N is that question's number.
+   For matching_headings and matching_features, give "startQuestion" as the first question number in that group.
+4. Also produce 4-8 "paraphrase_pairs": a key word or short phrase taken from one of the questions, paired with the word/phrase in the passage that means the same thing. Use exact wording from the passage for "phrase".
 
-Return only the structured data — no commentary.`,
+Return only the structured data — no commentary, and no answers to any question.`,
       },
       { inline_data: { mime_type: "application/pdf", data: pdfBase64 } },
     ],
@@ -160,7 +175,7 @@ Return only the structured data — no commentary.`,
         matching_headings: {
           type: "OBJECT",
           properties: {
-            ...groupProps,
+            ...GROUP_PROPS,
             headings: {
               type: "ARRAY",
               items: {
@@ -169,21 +184,14 @@ Return only the structured data — no commentary.`,
                 required: ["code", "label"],
               },
             },
-            items: {
-              type: "ARRAY",
-              items: {
-                type: "OBJECT",
-                properties: { paragraphLetter: { type: "STRING" }, answerCode: { type: "STRING" } },
-                required: ["paragraphLetter", "answerCode"],
-              },
-            },
+            paragraphLetters: { type: "ARRAY", items: { type: "STRING" } },
           },
           required: ["present"],
         },
         matching_features: {
           type: "OBJECT",
           properties: {
-            ...groupProps,
+            ...GROUP_PROPS,
             statements: {
               type: "ARRAY",
               items: {
@@ -192,32 +200,13 @@ Return only the structured data — no commentary.`,
                 required: ["code", "text"],
               },
             },
-            items: {
-              type: "ARRAY",
-              items: {
-                type: "OBJECT",
-                properties: { personOrFeature: { type: "STRING" }, answerCode: { type: "STRING" } },
-                required: ["personOrFeature", "answerCode"],
-              },
-            },
+            personsOrFeatures: { type: "ARRAY", items: { type: "STRING" } },
           },
           required: ["present"],
         },
         summary_completion: {
           type: "OBJECT",
-          properties: {
-            ...groupProps,
-            title: { type: "STRING" },
-            text: { type: "STRING" },
-            answers: {
-              type: "ARRAY",
-              items: {
-                type: "OBJECT",
-                properties: { question: { type: "INTEGER" }, answer: { type: "STRING" } },
-                required: ["question", "answer"],
-              },
-            },
-          },
+          properties: { ...GROUP_PROPS, title: { type: "STRING" }, text: { type: "STRING" } },
           required: ["present"],
         },
         paraphrase_pairs: {
@@ -231,18 +220,114 @@ Return only the structured data — no commentary.`,
       },
       required: ["title", "paragraphs", "matching_headings", "matching_features", "summary_completion"],
     },
-  )) as Partial<ReadingExamAiDraft>;
+  )) as Partial<ReadingExtraction>;
 
   return {
     title: result.title ?? "",
     subtitle: result.subtitle ?? "",
     paragraphs: result.paragraphs ?? [],
     glossary: result.glossary ?? [],
-    matching_headings: result.matching_headings ?? { present: false, label: "Matching Headings", startQuestion: 1, headings: [], items: [] },
-    matching_features: result.matching_features ?? { present: false, label: "Matching Features", startQuestion: 1, statements: [], items: [] },
-    summary_completion: result.summary_completion ?? { present: false, label: "Summary Completion", startQuestion: 1, title: "", text: "", answers: [] },
+    matching_headings: result.matching_headings ?? { present: false, label: "Matching Headings", startQuestion: 1, headings: [], paragraphLetters: [] },
+    matching_features: result.matching_features ?? { present: false, label: "Matching Features", startQuestion: 1, statements: [], personsOrFeatures: [] },
+    summary_completion: result.summary_completion ?? { present: false, label: "Summary Completion", startQuestion: 1, title: "", text: "" },
     paraphrase_pairs: result.paraphrase_pairs ?? [],
   };
+}
+
+function passageAsText(paragraphs: { letter: string; text: string }[]): string {
+  return paragraphs.map((p) => `${p.letter}. ${p.text}`).join("\n\n");
+}
+
+/** Step 2a: answers a matching-headings group — text-only (fast), run after extraction so it stays well under the platform's per-request time limit. */
+export async function solveMatchingHeadings(
+  paragraphs: { letter: string; text: string }[],
+  headings: { code: string; label: string }[],
+  paragraphLetters: string[],
+): Promise<{ paragraphLetter: string; answerCode: string }[]> {
+  const result = (await generateJson(
+    [
+      {
+        text: `Here is a passage split into lettered paragraphs:\n\n${passageAsText(paragraphs)}\n\nFor each of these paragraphs, in order: ${paragraphLetters.join(", ")} — choose the best-fitting heading from this list (each heading is used at most once): ${headings.map((h) => `${h.code}) ${h.label}`).join("; ")}.\n\nAnswer as a careful test-taker would, using only the passage text.`,
+      },
+    ],
+    {
+      type: "OBJECT",
+      properties: {
+        answers: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: { paragraphLetter: { type: "STRING" }, answerCode: { type: "STRING" } },
+            required: ["paragraphLetter", "answerCode"],
+          },
+        },
+      },
+      required: ["answers"],
+    },
+  )) as { answers?: { paragraphLetter: string; answerCode: string }[] };
+
+  return result.answers ?? [];
+}
+
+/** Step 2b: answers a matching-features group — text-only (fast). */
+export async function solveMatchingFeatures(
+  paragraphs: { letter: string; text: string }[],
+  statements: { code: string; text: string }[],
+  personsOrFeatures: string[],
+): Promise<{ personOrFeature: string; answerCode: string }[]> {
+  const result = (await generateJson(
+    [
+      {
+        text: `Here is a passage split into lettered paragraphs:\n\n${passageAsText(paragraphs)}\n\nFor each of these people/features, in order: ${personsOrFeatures.join(", ")} — choose the statement that best matches them from this list (each statement is used at most once): ${statements.map((s) => `${s.code}) ${s.text}`).join("; ")}.\n\nAnswer as a careful test-taker would, using only the passage text.`,
+      },
+    ],
+    {
+      type: "OBJECT",
+      properties: {
+        answers: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: { personOrFeature: { type: "STRING" }, answerCode: { type: "STRING" } },
+            required: ["personOrFeature", "answerCode"],
+          },
+        },
+      },
+      required: ["answers"],
+    },
+  )) as { answers?: { personOrFeature: string; answerCode: string }[] };
+
+  return result.answers ?? [];
+}
+
+/** Step 2c: answers a summary-completion group — text-only (fast). */
+export async function solveSummaryCompletion(
+  paragraphs: { letter: string; text: string }[],
+  summaryText: string,
+): Promise<{ question: number; answer: string }[]> {
+  const result = (await generateJson(
+    [
+      {
+        text: `Here is a passage split into lettered paragraphs:\n\n${passageAsText(paragraphs)}\n\nComplete this summary using one or a few words taken from the passage for each numbered blank:\n\n${summaryText}\n\nAnswer as a careful test-taker would, using only the passage text.`,
+      },
+    ],
+    {
+      type: "OBJECT",
+      properties: {
+        answers: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: { question: { type: "INTEGER" }, answer: { type: "STRING" } },
+            required: ["question", "answer"],
+          },
+        },
+      },
+      required: ["answers"],
+    },
+  )) as { answers?: { question: number; answer: string }[] };
+
+  return result.answers ?? [];
 }
 
 /** Transcribes listening-exam section audio so admin doesn't have to type it by hand — best-effort, always reviewable before saving. */

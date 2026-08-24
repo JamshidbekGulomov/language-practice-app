@@ -8,7 +8,10 @@ import {
   addWord,
   deleteWord,
   createPdfUploadUrl,
-  analyzePassageWithAi,
+  extractPassage,
+  solveHeadings,
+  solveFeatures,
+  solveSummary,
   suggestWords,
   addWordsBulk,
 } from "@/app/admin/reading-exam/actions";
@@ -174,13 +177,13 @@ export function PassageEditor({
         return;
       }
 
-      setAiProgress("Reading passage and questions with AI… this can take a minute");
-      const result = await analyzePassageWithAi(path);
-      if (!result.ok) {
-        setAiError(result.error);
+      setAiProgress("Reading passage and questions with AI…");
+      const extraction = await extractPassage(path);
+      if (!extraction.ok) {
+        setAiError(extraction.error);
         return;
       }
-      const draft = result.data;
+      const draft = extraction.data;
 
       if (draft.title) setTitle(draft.title);
       if (draft.subtitle) setSubtitle(draft.subtitle);
@@ -188,23 +191,49 @@ export function PassageEditor({
       if (draft.glossary.length) setGlossary(draft.glossary);
       if (draft.paraphrase_pairs.length) setParaphrasePairs(draft.paraphrase_pairs);
 
-      const mhg = draft.question_groups.find((g): g is MatchingHeadingsGroup => g.type === "matching_headings");
-      if (mhg) {
-        setUseMH(true);
-        setMh(mhg);
+      // Answering each question type is a separate, smaller AI call run after
+      // extraction — one call trying to extract AND answer everything at once
+      // routinely exceeded the platform's per-request time limit.
+      const warnings: string[] = [];
+
+      if (draft.matching_headings.present) {
+        setAiProgress("Solving Matching Headings…");
+        const mh = draft.matching_headings;
+        const solved = await solveHeadings(draft.paragraphs, mh.headings, mh.paragraphLetters, mh.startQuestion || 1);
+        if (solved.ok) {
+          setUseMH(true);
+          setMh({ type: "matching_headings", label: mh.label || "Matching Headings", startQuestion: mh.startQuestion || 1, headings: mh.headings, items: solved.data });
+        } else {
+          warnings.push(`Matching Headings: ${solved.error}`);
+        }
       }
-      const mfg = draft.question_groups.find((g): g is MatchingFeaturesGroup => g.type === "matching_features");
-      if (mfg) {
-        setUseMF(true);
-        setMf(mfg);
+
+      if (draft.matching_features.present) {
+        setAiProgress("Solving Matching Features…");
+        const mf = draft.matching_features;
+        const solved = await solveFeatures(draft.paragraphs, mf.statements, mf.personsOrFeatures, mf.startQuestion || 1);
+        if (solved.ok) {
+          setUseMF(true);
+          setMf({ type: "matching_features", label: mf.label || "Matching Features", startQuestion: mf.startQuestion || 1, statements: mf.statements, items: solved.data });
+        } else {
+          warnings.push(`Matching Features: ${solved.error}`);
+        }
       }
-      const scg = draft.question_groups.find((g): g is SummaryCompletionGroup => g.type === "summary_completion");
-      if (scg) {
-        setUseSC(true);
-        setSc(scg);
+
+      if (draft.summary_completion.present) {
+        setAiProgress("Solving Summary Completion…");
+        const sc0 = draft.summary_completion;
+        const solved = await solveSummary(draft.paragraphs, sc0.text);
+        if (solved.ok) {
+          setUseSC(true);
+          setSc({ type: "summary_completion", label: sc0.label || "Summary Completion", startQuestion: sc0.startQuestion || 1, title: sc0.title, text: sc0.text, answers: solved.data });
+        } else {
+          warnings.push(`Summary Completion: ${solved.error}`);
+        }
       }
 
       setAiApplied(true);
+      setAiError(warnings.length > 0 ? `Passage filled in, but: ${warnings.join("; ")}` : null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
       setAiError(err instanceof Error ? err.message : "AI analysis failed");

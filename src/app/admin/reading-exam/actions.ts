@@ -7,7 +7,14 @@ import { requireAdmin } from "@/lib/supabase/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/slugify";
 import { isExam } from "@/lib/exam";
-import { analyzeReadingExamPdf, suggestWordsFromText } from "@/lib/ai/gemini";
+import {
+  extractReadingPassage,
+  solveMatchingHeadings,
+  solveMatchingFeatures,
+  solveSummaryCompletion,
+  suggestWordsFromText,
+  type ReadingExtraction,
+} from "@/lib/ai/gemini";
 import type {
   ReadingExamTest,
   ReadingExamPassage,
@@ -16,6 +23,8 @@ import type {
   GlossaryTerm,
   QuestionGroup,
   ParaphrasePair,
+  MatchingHeadingsGroup,
+  MatchingFeaturesGroup,
 } from "@/lib/reading-exam/types";
 
 const ADMIN_UPLOADS_BUCKET = "admin-uploads";
@@ -116,22 +125,26 @@ export async function createPdfUploadUrl(
   }
 }
 
-export type PassageAiDraft = {
+export type PassageExtractionResult = {
   title: string;
   subtitle: string;
   paragraphs: Paragraph[];
   glossary: GlossaryTerm[];
-  question_groups: QuestionGroup[];
   paraphrase_pairs: ParaphrasePair[];
+  matching_headings: ReadingExtraction["matching_headings"];
+  matching_features: ReadingExtraction["matching_features"];
+  summary_completion: ReadingExtraction["summary_completion"];
 };
 
 /**
- * Downloads the just-uploaded PDF, sends it to Gemini for full extraction
- * (passage, question groups, best-guess answers), converts the result into
- * this app's QuestionGroup shape, and deletes the temp upload. The admin
- * still has to hit "Save passage" — this only pre-fills the editor.
+ * Step 1: downloads the just-uploaded PDF and asks Gemini to extract the
+ * passage/glossary/question structure only (no answers yet — see the
+ * solve* actions below). Kept deliberately small and fast: a single call
+ * that both extracts AND answers every question routinely exceeded
+ * Vercel's per-request duration limit, which killed the request outright
+ * with no usable response.
  */
-export async function analyzePassageWithAi(path: string): Promise<ActionResult<PassageAiDraft>> {
+export async function extractPassage(path: string): Promise<ActionResult<PassageExtractionResult>> {
   try {
     await requireAdmin();
     const admin = createAdminClient();
@@ -142,47 +155,9 @@ export async function analyzePassageWithAi(path: string): Promise<ActionResult<P
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const draft = await analyzeReadingExamPdf(buffer.toString("base64"));
+    const draft = await extractReadingPassage(buffer.toString("base64"));
 
     admin.storage.from(ADMIN_UPLOADS_BUCKET).remove([path]).catch(() => {});
-
-    const question_groups: QuestionGroup[] = [];
-    if (draft.matching_headings.present) {
-      question_groups.push({
-        type: "matching_headings",
-        label: draft.matching_headings.label || "Matching Headings",
-        startQuestion: draft.matching_headings.startQuestion || 1,
-        headings: draft.matching_headings.headings,
-        items: draft.matching_headings.items.map((it, i) => ({
-          question: (draft.matching_headings.startQuestion || 1) + i,
-          paragraphLetter: it.paragraphLetter,
-          answerCode: it.answerCode,
-        })),
-      });
-    }
-    if (draft.matching_features.present) {
-      question_groups.push({
-        type: "matching_features",
-        label: draft.matching_features.label || "Matching Features",
-        startQuestion: draft.matching_features.startQuestion || 1,
-        statements: draft.matching_features.statements,
-        items: draft.matching_features.items.map((it, i) => ({
-          question: (draft.matching_features.startQuestion || 1) + i,
-          personOrFeature: it.personOrFeature,
-          answerCode: it.answerCode,
-        })),
-      });
-    }
-    if (draft.summary_completion.present) {
-      question_groups.push({
-        type: "summary_completion",
-        label: draft.summary_completion.label || "Summary Completion",
-        startQuestion: draft.summary_completion.startQuestion || 1,
-        title: draft.summary_completion.title,
-        text: draft.summary_completion.text,
-        answers: draft.summary_completion.answers,
-      });
-    }
 
     return {
       ok: true,
@@ -191,12 +166,70 @@ export async function analyzePassageWithAi(path: string): Promise<ActionResult<P
         subtitle: draft.subtitle,
         paragraphs: draft.paragraphs,
         glossary: draft.glossary.map((g) => ({ word: g.word, def: g.def, syn: g.syn ?? "", uz: g.uz ?? "" })),
-        question_groups,
         paraphrase_pairs: draft.paraphrase_pairs,
+        matching_headings: draft.matching_headings,
+        matching_features: draft.matching_features,
+        summary_completion: draft.summary_completion,
       },
     };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "AI analysis failed" };
+    return { ok: false, error: err instanceof Error ? err.message : "AI extraction failed" };
+  }
+}
+
+/** Step 2a: answers a matching-headings group — text-only, run after extraction. */
+export async function solveHeadings(
+  paragraphs: Paragraph[],
+  headings: { code: string; label: string }[],
+  paragraphLetters: string[],
+  startQuestion: number,
+): Promise<ActionResult<MatchingHeadingsGroup["items"]>> {
+  try {
+    await requireAdmin();
+    const answers = await solveMatchingHeadings(paragraphs, headings, paragraphLetters);
+    const items = paragraphLetters.map((letter, i) => ({
+      question: startQuestion + i,
+      paragraphLetter: letter,
+      answerCode: answers.find((a) => a.paragraphLetter === letter)?.answerCode ?? "",
+    }));
+    return { ok: true, data: items };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Couldn't solve matching headings" };
+  }
+}
+
+/** Step 2b: answers a matching-features group — text-only, run after extraction. */
+export async function solveFeatures(
+  paragraphs: Paragraph[],
+  statements: { code: string; text: string }[],
+  personsOrFeatures: string[],
+  startQuestion: number,
+): Promise<ActionResult<MatchingFeaturesGroup["items"]>> {
+  try {
+    await requireAdmin();
+    const answers = await solveMatchingFeatures(paragraphs, statements, personsOrFeatures);
+    const items = personsOrFeatures.map((name, i) => ({
+      question: startQuestion + i,
+      personOrFeature: name,
+      answerCode: answers.find((a) => a.personOrFeature === name)?.answerCode ?? "",
+    }));
+    return { ok: true, data: items };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Couldn't solve matching features" };
+  }
+}
+
+/** Step 2c: answers a summary-completion group — text-only, run after extraction. */
+export async function solveSummary(
+  paragraphs: Paragraph[],
+  summaryText: string,
+): Promise<ActionResult<{ question: number; answer: string }[]>> {
+  try {
+    await requireAdmin();
+    const answers = await solveSummaryCompletion(paragraphs, summaryText);
+    return { ok: true, data: answers };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Couldn't solve the summary" };
   }
 }
 
