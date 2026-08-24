@@ -3,6 +3,19 @@ import type { TextItem } from "pdfjs-dist/types/src/display/api";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
+export type PdfTextExtraction = {
+  /** Best-effort paragraph split, used to pre-fill the passage editor's paragraph rows. */
+  paragraphs: { letter: string; text: string }[];
+  /**
+   * The full extracted text, in reading order — passage AND questions,
+   * whatever the PDF contains. Paragraph-splitting only knows how to guess
+   * at passage structure, so when a PDF has its questions in the same
+   * file, this is where the admin finds and copies them from: matching
+   * headings/statements, summary text, answer options, etc.
+   */
+  fullText: string;
+};
+
 /**
  * Extracts plain text from a PDF entirely in the browser — no AI, no
  * server round-trip, so no risk of the Vercel function-duration crash the
@@ -14,7 +27,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
  * the AI path, it does not identify glossary terms, question groups, or
  * answers; those are still filled in by hand in the structured editor.
  */
-export async function extractPdfText(file: File): Promise<{ letter: string; text: string }[]> {
+export async function extractPdfText(file: File): Promise<PdfTextExtraction> {
   const buffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
 
@@ -37,8 +50,10 @@ export async function extractPdfText(file: File): Promise<{ letter: string; text
       lastY = y;
     }
     if (currentLine.trim()) lines.push(currentLine.trim());
-    lines.push("");
+    lines.push(`--- page ${pageNum} end ---`, "");
   }
+
+  const fullText = lines.join("\n").trim();
 
   const letterMarker = /^([A-H])[\s.]+(.*)/;
   const lettered = lines.filter((l) => letterMarker.test(l));
@@ -51,18 +66,18 @@ export async function extractPdfText(file: File): Promise<{ letter: string; text
       if (match) {
         if (current) paragraphs.push(current);
         current = { letter: match[1], text: match[2] };
-      } else if (current && line.trim()) {
+      } else if (current && line.trim() && !line.startsWith("---")) {
         current.text += " " + line.trim();
       }
     }
     if (current) paragraphs.push(current);
-    return paragraphs;
+    return { paragraphs, fullText };
   }
 
   const blocks: string[] = [];
   let block = "";
   for (const line of lines) {
-    if (!line.trim()) {
+    if (!line.trim() || line.startsWith("---")) {
       if (block.trim()) blocks.push(block.trim());
       block = "";
     } else {
@@ -71,5 +86,5 @@ export async function extractPdfText(file: File): Promise<{ letter: string; text
   }
   if (block.trim()) blocks.push(block.trim());
 
-  return blocks.map((text, i) => ({ letter: String.fromCharCode(65 + i), text }));
+  return { paragraphs: blocks.map((text, i) => ({ letter: String.fromCharCode(65 + i), text })), fullText };
 }

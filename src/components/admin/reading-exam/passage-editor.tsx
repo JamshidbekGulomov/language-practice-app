@@ -67,6 +67,7 @@ export function PassageEditor({
   const [textPending, setTextPending] = useState(false);
   const [textError, setTextError] = useState<string | null>(null);
   const [textApplied, setTextApplied] = useState(false);
+  const [extractedText, setExtractedText] = useState<string | null>(null);
   const textFileInputRef = useRef<HTMLInputElement>(null);
 
   const [wordSuggestions, setWordSuggestions] = useState<{ word: string; meaning: string; checked: boolean }[]>([]);
@@ -287,12 +288,13 @@ export function PassageEditor({
     setTextApplied(false);
     setTextPending(true);
     try {
-      const extracted = await extractPdfText(file);
-      if (extracted.length === 0) {
+      const { paragraphs: extracted, fullText } = await extractPdfText(file);
+      if (!fullText) {
         setTextError("Couldn't find any text in that PDF (it may be a scanned image).");
         return;
       }
-      setParagraphs(extracted);
+      if (extracted.length > 0) setParagraphs(extracted);
+      setExtractedText(fullText);
       setTextApplied(true);
       if (textFileInputRef.current) textFileInputRef.current.value = "";
     } catch (err) {
@@ -307,9 +309,11 @@ export function PassageEditor({
       <Section title="📄 Load text from a PDF (no AI)">
         <p className="mb-3 text-xs text-slate-500">
           Pulls the raw text out of the PDF, entirely in your browser — no AI, no server call, instant. It guesses
-          paragraph breaks (from lettered markers like &ldquo;A&rdquo;, or blank lines) so you don&apos;t have to
-          retype the passage, but you still split/merge/edit the paragraphs below and fill in the glossary and
-          questions yourself.
+          paragraph breaks (from lettered markers like &ldquo;A&rdquo;, or blank lines) and fills the passage
+          paragraphs below. If your PDF also has the questions in it, they&apos;ll show up as extra paragraph rows —
+          delete those from the list below, then use the &ldquo;Full extracted text&rdquo; box underneath to copy
+          the headings/statements/answers into the matching Matching Headings, Matching Features, and Summary
+          Completion fields further down.
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <input ref={textFileInputRef} type="file" accept="application/pdf" className="text-sm" />
@@ -323,6 +327,22 @@ export function PassageEditor({
           {textApplied && <span className="text-sm font-medium text-emerald-600">Paragraphs filled in below ✓</span>}
         </div>
         {textError && <p className="mt-2 text-sm text-red-600">{textError}</p>}
+
+        {extractedText && (
+          <div className="mt-4">
+            <p className="mb-1 text-xs font-semibold text-slate-500">
+              Full extracted text (passage + questions, whatever the PDF has) — select and copy from here into any
+              field below
+            </p>
+            <textarea
+              readOnly
+              value={extractedText}
+              rows={12}
+              onFocus={(e) => e.target.select()}
+              className="w-full whitespace-pre-wrap rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700"
+            />
+          </div>
+        )}
       </Section>
 
       <Section title="🤖 Analyze a PDF with AI (optional)">
