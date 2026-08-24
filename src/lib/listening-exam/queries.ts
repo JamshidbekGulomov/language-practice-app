@@ -13,6 +13,16 @@ export async function listTests(exam: Exam): Promise<ListeningExamTest[]> {
   return data ?? [];
 }
 
+export async function countTests(exam: Exam): Promise<number> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("listening_exam_tests")
+    .select("id", { count: "exact", head: true })
+    .eq("exam", exam);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
 export async function getTestBySlug(slug: string): Promise<ListeningExamTest | null> {
   const supabase = await createClient();
   const { data } = await supabase.from("listening_exam_tests").select("*").eq("slug", slug).maybeSingle();

@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Headphones, BookOpen, Mic } from "lucide-react";
-import { isExam } from "@/lib/exam";
+import { isExam, type Exam } from "@/lib/exam";
 import { SPEAKING_EXAMS } from "@/lib/speaking/exams";
+import { countTests as countReadingTests } from "@/lib/reading-exam/queries";
+import { countTests as countListeningTests } from "@/lib/listening-exam/queries";
 
 const WINDOWS = [
   {
@@ -11,7 +13,9 @@ const WINDOWS = [
     tagline: "Exam-focused audio clips and vocab practice",
     icon: Headphones,
     gradient: "from-sky-400 to-blue-600",
+    badgeCls: "bg-sky-50 text-sky-700",
     href: (exam: string) => `/${exam}/listening`,
+    count: (exam: Exam) => countListeningTests(exam),
   },
   {
     key: "reading",
@@ -19,7 +23,9 @@ const WINDOWS = [
     tagline: "Exam-focused passages and vocab practice",
     icon: BookOpen,
     gradient: "from-emerald-400 to-teal-600",
+    badgeCls: "bg-emerald-50 text-emerald-700",
     href: (exam: string) => `/${exam}/reading`,
+    count: (exam: Exam) => countReadingTests(exam),
   },
   {
     key: "speaking",
@@ -27,7 +33,9 @@ const WINDOWS = [
     tagline: "Parts, topics, and guided questions",
     icon: Mic,
     gradient: "from-rose-400 to-pink-600",
+    badgeCls: "",
     href: (exam: string) => `/speaking/${exam}`,
+    count: null,
   },
 ];
 
@@ -40,6 +48,7 @@ export default async function ExamHubPage({
   if (!isExam(exam)) notFound();
 
   const label = SPEAKING_EXAMS[exam].label;
+  const counts = await Promise.all(WINDOWS.map((w) => (w.count ? w.count(exam) : Promise.resolve(null))));
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
@@ -51,8 +60,9 @@ export default async function ExamHubPage({
       </div>
 
       <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-3">
-        {WINDOWS.map((w) => {
+        {WINDOWS.map((w, i) => {
           const Icon = w.icon;
+          const count = counts[i];
           return (
             <Link
               key={w.key}
@@ -66,9 +76,15 @@ export default async function ExamHubPage({
               </div>
               <h2 className="mt-4 text-xl font-bold text-slate-900">{w.name}</h2>
               <p className="mt-1 text-sm text-slate-500">{w.tagline}</p>
-              <span className="mt-4 inline-block text-sm font-semibold text-slate-400 transition group-hover:text-indigo-600">
-                Explore &rarr;
-              </span>
+              {count !== null ? (
+                <span className={`mt-3 inline-block rounded-full px-3 py-1 text-xs font-bold ${w.badgeCls}`}>
+                  {count} test{count === 1 ? "" : "s"}
+                </span>
+              ) : (
+                <span className="mt-4 inline-block text-sm font-semibold text-slate-400 transition group-hover:text-indigo-600">
+                  Explore &rarr;
+                </span>
+              )}
             </Link>
           );
         })}

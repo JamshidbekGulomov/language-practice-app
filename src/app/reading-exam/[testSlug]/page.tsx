@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Play, Clock, FileText, BookOpen } from "lucide-react";
 import { getTestBySlug, getPassagesForTest } from "@/lib/reading-exam/queries";
+import { questionsInGroup } from "@/lib/reading-exam/types";
 import { EXAM_LABELS } from "@/lib/exam";
+import { PracticeSinglePassages } from "@/components/reading-exam/practice-single-passages";
 
 export default async function ReadingExamTestPage({
   params,
@@ -13,33 +16,41 @@ export default async function ReadingExamTestPage({
   if (!test) notFound();
 
   const passages = await getPassagesForTest(test.id);
+  const passageStats = passages.map((p) => ({
+    passage_number: p.passage_number,
+    title: p.title,
+    questionCount: p.question_groups.reduce((sum, g) => sum + questionsInGroup(g).length, 0),
+  }));
+  const totalQuestions = passageStats.reduce((sum, p) => sum + p.questionCount, 0);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+    <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6">
       <div className="text-center">
-        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">{test.title}</h1>
-        <p className="mt-2 text-slate-500">{EXAM_LABELS[test.exam]} Reading &middot; practice a single passage, or take the full exam.</p>
+        <p className="text-sm font-semibold text-emerald-600">{EXAM_LABELS[test.exam]} Reading</p>
+        <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">{test.title}</h1>
       </div>
 
-      <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {passages.map((p) => (
-          <Link
-            key={p.id}
-            href={`/reading-exam/${testSlug}/passage/${p.passage_number}`}
-            className="rounded-xl border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-md"
-          >
-            <h2 className="font-bold text-slate-900">Passage {p.passage_number}</h2>
-            <p className="mt-1 text-sm text-slate-500">{p.title}</p>
-          </Link>
-        ))}
+      <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-slate-500">
+          <span className="inline-flex items-center gap-1.5">
+            <Clock className="h-4 w-4" /> 60 min
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <FileText className="h-4 w-4" /> {totalQuestions} questions
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <BookOpen className="h-4 w-4" /> {passages.length} passages
+          </span>
+        </div>
 
         <Link
           href={`/reading-exam/${testSlug}/full`}
-          className="rounded-xl border-2 border-red-200 bg-red-50 p-5 transition hover:-translate-y-0.5 hover:shadow-md sm:col-span-2"
+          className="mt-5 flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 py-3 text-sm font-bold text-white shadow-sm transition hover:from-amber-400 hover:to-orange-500"
         >
-          <h2 className="font-bold text-red-700">🎯 Full Exam</h2>
-          <p className="mt-1 text-sm text-red-500">All three passages, one continuous 60-minute test.</p>
+          <Play className="h-4 w-4 fill-current" /> Start Full Exam (60 min)
         </Link>
+
+        <PracticeSinglePassages testSlug={testSlug} passages={passageStats} />
       </div>
     </div>
   );
