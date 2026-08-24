@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { ReadingExamPassage, MatchingHeadingsGroup, MatchingFeaturesGroup, SummaryCompletionGroup } from "@/lib/reading-exam/types";
 import { questionsInGroup } from "@/lib/reading-exam/types";
 import { gradePassage, type GradeResult } from "@/lib/reading-exam/grading";
-import { splitOnGlossary } from "@/lib/reading-exam/render-glossary";
+import { renderPassageSegments, textOffsetWithin, type HighlightRange } from "@/lib/reading-exam/render-glossary";
 import { submitAttempt } from "@/app/reading-exam/actions";
 import { ResultsModal } from "@/components/reading-exam/results-modal";
 
@@ -66,6 +66,16 @@ export function ExamPlayer({
   const [secondsLeft, setSecondsLeft] = useState(defaultSeconds);
   const [elapsed, setElapsed] = useState(0);
 
+  const [highlights, setHighlights] = useState<Record<string, HighlightRange[]>>({});
+  const [pendingHighlight, setPendingHighlight] = useState<{
+    key: string;
+    start: number;
+    end: number;
+    x: number;
+    y: number;
+  } | null>(null);
+  const paragraphRefs = useRef<Record<string, HTMLElement | null>>({});
+
   const dragRef = useRef<HTMLDivElement>(null);
 
   const t = THEME_CLASSES[theme];
@@ -103,6 +113,15 @@ export function ExamPlayer({
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
 
+  useEffect(() => {
+    function onSelectionChange() {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed) setPendingHighlight(null);
+    }
+    document.addEventListener("selectionchange", onSelectionChange);
+    return () => document.removeEventListener("selectionchange", onSelectionChange);
+  }, []);
+
   function toggleFullscreen() {
     if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
     else document.exitFullscreen?.().catch(() => {});
@@ -125,6 +144,59 @@ export function ExamPlayer({
     }
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
+  }
+
+  function handlePassageSelection() {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+      setPendingHighlight(null);
+      return;
+    }
+    const range = selection.getRangeAt(0);
+    const letterEntry = Object.entries(paragraphRefs.current).find(
+      ([, el]) => el && el.contains(range.commonAncestorContainer),
+    );
+    if (!letterEntry) return;
+    const [key, root] = letterEntry;
+    if (!root) return;
+
+    const start = textOffsetWithin(root, range.startContainer, range.startOffset);
+    const end = textOffsetWithin(root, range.endContainer, range.endOffset);
+    if (start === end) return;
+
+    const rect = range.getBoundingClientRect();
+    setPendingHighlight({
+      key,
+      start: Math.min(start, end),
+      end: Math.max(start, end),
+      x: rect.left + rect.width / 2,
+      y: rect.top,
+    });
+  }
+
+  function confirmHighlight() {
+    if (!pendingHighlight) return;
+    const { key, start, end } = pendingHighlight;
+    setHighlights((prev) => {
+      const existing = prev[key] ?? [];
+      const merged = [...existing, { start, end }].sort((a, b) => a.start - b.start);
+      const collapsed: HighlightRange[] = [];
+      for (const r of merged) {
+        const last = collapsed[collapsed.length - 1];
+        if (last && r.start <= last.end) last.end = Math.max(last.end, r.end);
+        else collapsed.push({ ...r });
+      }
+      return { ...prev, [key]: collapsed };
+    });
+    window.getSelection()?.removeAllRanges();
+    setPendingHighlight(null);
+  }
+
+  function removeHighlight(key: string, start: number, end: number) {
+    setHighlights((prev) => ({
+      ...prev,
+      [key]: (prev[key] ?? []).filter((r) => !(r.start <= start && r.end >= end)),
+    }));
   }
 
   function placeHeading(group: MatchingHeadingsGroup, letter: string, code: string) {
@@ -302,11 +374,21 @@ export function ExamPlayer({
       )}
 
       <div className="relative flex min-h-0 flex-1" style={{ fontSize: `${fontScale * 100}%` }}>
-        <div className={`overflow-y-auto p-6 ${t.panel}`} style={{ width: `${leftWidthPct}%` }}>
+        <div
+          className={`overflow-y-auto p-6 ${t.panel}`}
+          style={{ width: `${leftWidthPct}%` }}
+          onMouseUp={handlePassageSelection}
+          onTouchEnd={handlePassageSelection}
+        >
           <h2 className="mb-1 text-lg font-extrabold">{passage.title}</h2>
           {passage.subtitle && <p className={`mb-4 border-b pb-3 italic ${t.subtext} ${t.border}`}>{passage.subtitle}</p>}
 
+          <p className={`mb-3 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${t.border} ${t.subtext}`}>
+            Select text to highlight, tap it to clear
+          </p>
+
           {passage.paragraphs.map((para) => {
+            const key = `${activeIdx}:${para.letter}`;
             const mhGroup = passage.question_groups.find((g) => g.type === "matching_headings") as
               | MatchingHeadingsGroup
               | undefined;
@@ -349,19 +431,33 @@ export function ExamPlayer({
                 )}
                 <p className="text-justify leading-relaxed">
                   <span className="mr-1.5 font-extrabold text-red-600">{para.letter}</span>
-                  {splitOnGlossary(para.text, passage.glossary).map((part, i) =>
-                    typeof part === "string" ? (
-                      <span key={i}>{part}</span>
-                    ) : (
-                      <span
-                        key={i}
-                        onClick={(e) => setGlossaryPopup({ x: e.clientX, y: e.clientY, term: part.term })}
-                        className="cursor-pointer border-b border-dotted border-purple-400 text-inherit"
-                      >
-                        {part.term.word}
-                      </span>
-                    ),
-                  )}
+                  <span ref={(el) => { paragraphRefs.current[key] = el; }}>
+                    {renderPassageSegments(para.text, passage.glossary, highlights[key] ?? []).map((seg, i) => {
+                      const commonCls = seg.highlighted ? "bg-yellow-200 cursor-pointer" : "";
+                      if (seg.term) {
+                        return (
+                          <span
+                            key={i}
+                            onClick={(e) => {
+                              if (seg.highlighted) removeHighlight(key, seg.start, seg.end);
+                              else setGlossaryPopup({ x: e.clientX, y: e.clientY, term: seg.term! });
+                            }}
+                            className={`cursor-pointer border-b border-dotted border-purple-400 text-inherit ${commonCls}`}
+                          >
+                            {seg.text}
+                          </span>
+                        );
+                      }
+                      if (seg.highlighted) {
+                        return (
+                          <span key={i} onClick={() => removeHighlight(key, seg.start, seg.end)} className={commonCls}>
+                            {seg.text}
+                          </span>
+                        );
+                      }
+                      return <span key={i}>{seg.text}</span>;
+                    })}
+                  </span>
                 </p>
               </div>
             );
@@ -424,6 +520,16 @@ export function ExamPlayer({
             {glossaryPopup.term.syn && <p className="text-xs text-slate-500">Synonyms: {glossaryPopup.term.syn}</p>}
             {glossaryPopup.term.uz && <p className="mt-1 border-t border-dashed border-slate-200 pt-1 text-xs text-slate-500">🇺🇿 {glossaryPopup.term.uz}</p>}
           </div>
+        )}
+
+        {pendingHighlight && !checked && (
+          <button
+            onClick={confirmHighlight}
+            className="fixed z-50 -translate-x-1/2 -translate-y-full rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white shadow-lg hover:bg-red-700"
+            style={{ left: pendingHighlight.x, top: pendingHighlight.y - 8 }}
+          >
+            Highlight
+          </button>
         )}
       </div>
 
